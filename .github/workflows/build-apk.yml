@@ -1,0 +1,66 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Build web assets
+        run: |
+          echo "Web assets are static, no build step needed."
+          ls -la www/
+
+      - name: Sync Capacitor
+        run: npx cap sync android --no-open
+
+      - name: Create signing keystore
+        run: |
+          keytool -genkeypair -v -keystore app/release.keystore \
+            -alias photo-diary -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Photo Diary, OU=Personal, O=PhotoDiary, L=Beijing, ST=Beijing, C=CN"
+
+      - name: Create keystore.properties
+        run: |
+          echo "storeFile=release.keystore" > android/keystore.properties
+          echo "storePassword=android" >> android/keystore.properties
+          echo "keyAlias=photo-diary" >> android/keystore.properties
+          echo "keyPassword=android" >> android/keystore.properties
+
+      - name: Build release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: photo-diary-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
