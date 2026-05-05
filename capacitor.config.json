@@ -1,6 +1,6 @@
 {
-  "appId": "com.photodiary.app",
-  "appName": "照片日记",
+  "appId": "com.jiying.map",
+  "appName": "迹影地图",
   "webDir": "www",
   "bundledWebRuntime": false,
   "server": {

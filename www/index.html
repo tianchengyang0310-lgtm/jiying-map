@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
-<title>照片日记</title>
+<title>迹影地图</title>
 <style>
 :root {
   --bg:#08080f; --card:rgba(255,255,255,0.03); --card-hover:rgba(255,255,255,0.06);
@@ -220,8 +220,8 @@ body::before{
 
 <!-- Password -->
 <div id="pw-gate">
-  <div class="pw-title">Photo Diary</div>
-  <div style="font-size:0.82rem;color:var(--text3)">输入密码以查看照片日记</div>
+  <div class="pw-title">迹影地图</div>
+  <div style="font-size:0.82rem;color:var(--text3)">输入密码以查看照片</div>
   <input type="password" id="pw-input" placeholder="····" maxlength="20" autofocus>
   <button id="pw-submit">进入</button>
   <div id="pw-error">密码错误，请重试</div>
@@ -235,7 +235,7 @@ body::before{
 <div id="app">
   <div id="offline-banner">⚠️ 当前离线 — 地图需要网络</div>
   <header id="header">
-    <div id="logo">Photo Diary</div>
+    <div id="logo">迹影地图</div>
     <div class="view-tabs">
       <button class="tab active" data-view="timeline">📅 时间线</button>
       <button class="tab" data-view="map">🗺️ 地图</button>
@@ -298,7 +298,7 @@ body::before{
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// 照片日记 App — 所有状态和数据
+// 迹影地图 — 离线照片管理与地图浏览
 // ═══════════════════════════════════════════════════════════════
 
 // ── Password Gate ────────────────────────────────────────────
@@ -307,7 +307,6 @@ body::before{
   var input = document.getElementById('pw-input');
   var submit = document.getElementById('pw-submit');
   var err = document.getElementById('pw-error');
-
   async function unlock(){
     var pw = input.value.trim();
     var encoder = new TextEncoder();
@@ -315,7 +314,7 @@ body::before{
     var hash = await crypto.subtle.digest('SHA-256', data);
     var hex = Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,'0')}).join('');
     var stored = localStorage.getItem('_pwd_hash');
-    if(hex === stored || btoa(pw) === 'MDMyMw=='){ // 0323
+    if(hex === stored || btoa(pw) === 'MDMyMw=='){ // 密码 0323
       if(!stored) localStorage.setItem('_pwd_hash', hex);
       gate.classList.add('hidden');
       initApp();
@@ -324,76 +323,70 @@ body::before{
       setTimeout(function(){err.classList.remove('show')},2000);
     }
   }
-
   submit.addEventListener('click', unlock);
   input.addEventListener('keydown', function(e){if(e.key==='Enter') unlock();});
-
-  // 快速重进：之前已解锁过
-  if(localStorage.getItem('_pwd_hash')){
-    gate.classList.add('hidden');
-    initApp();
-  }
+  if(localStorage.getItem('_pwd_hash')){ gate.classList.add('hidden'); initApp(); }
 })();
 
 // ═══════════════════════════════════════════════════════════════
 // 全局状态
 // ═══════════════════════════════════════════════════════════════
 var S = {
-  photos: [],
-  byDate: {},
-  dates: [],
-  view: 'timeline',
-  curIdx: -1,
-  map: null,
-  cluster: null,
-  minimap: null,
-  notes: {},
-  filtered: null,
-  isOnline: navigator.onLine,
-  imgObserver: null,
+  photos: [], byDate: {}, dates: [], view: 'timeline', curIdx: -1,
+  map: null, cluster: null, minimap: null, notes: {}, filtered: null,
+  isOnline: navigator.onLine, imgObserver: null
 };
-
-// DOM shortcuts
 var D = {};
 function $(s){return document.querySelector(s)}
 function initDom(){
-  D.loading = $('#loading');
-  D.loadingText = $('#loading-text');
-  D.timeline = $('#timeline');
-  D.mapView = $('#map-view');
-  D.mapContainer = $('#map-container');
-  D.stats = $('#stats');
-  D.search = $('#search');
-  D.importBtn = $('#import-btn');
-  D.tabs = document.querySelectorAll('.tab');
-  D.modal = $('#modal');
-  D.modalImg = $('#modal-image');
-  D.modalDate = $('#modal-date-big');
-  D.modalTime = $('#modal-time-big');
-  D.modalCamera = $('#modal-camera');
-  D.modalLoc = $('#modal-location');
-  D.modalMinimap = $('#modal-minimap');
-  D.noteInput = $('#note-input');
-  D.noteSave = $('#note-save');
-  D.noteSaved = $('#note-saved');
-  D.progress = $('#import-progress');
-  D.progressFill = $('#progress-fill');
-  D.progressText = $('#progress-text');
-  D.offlineBanner = $('#offline-banner');
-  D.toast = $('#toast');
+  D.loading=$('#loading'); D.loadingText=$('#loading-text');
+  D.timeline=$('#timeline'); D.mapView=$('#map-view'); D.mapContainer=$('#map-container');
+  D.stats=$('#stats'); D.search=$('#search'); D.importBtn=$('#import-btn');
+  D.tabs=document.querySelectorAll('.tab'); D.modal=$('#modal'); D.modalImg=$('#modal-image');
+  D.modalDate=$('#modal-date-big'); D.modalTime=$('#modal-time-big'); D.modalCamera=$('#modal-camera');
+  D.modalLoc=$('#modal-location'); D.modalMinimap=$('#modal-minimap');
+  D.noteInput=$('#note-input'); D.noteSave=$('#note-save'); D.noteSaved=$('#note-saved');
+  D.progress=$('#import-progress'); D.progressFill=$('#progress-fill'); D.progressText=$('#progress-text');
+  D.offlineBanner=$('#offline-banner'); D.toast=$('#toast');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 坐标验证 — 核心修复：拒绝 Infinity / NaN / 越界值
+// ═══════════════════════════════════════════════════════════════
+function isValidCoord(lat, lng){
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+}
+// 数据清洗：修复历史错误数据
+function normalizePhoto(p){
+  if(!p) return null;
+  var lat = Number(p.lat), lng = Number(p.lng);
+  var hasLoc = isValidCoord(lat, lng);
+  return {
+    id: p.id, filename: p.filename||'IMG.jpg', size: p.size||0,
+    datetime: p.datetime||new Date().toISOString(),
+    lat: hasLoc ? lat : null,
+    lng: hasLoc ? lng : null,
+    hasLocation: hasLoc,
+    camera: p.camera || null,
+    url: p.url||'', thumbUrl: p.thumbUrl||'',
+    note: p.note||'',
+  };
 }
 
 // ── Utilities ────────────────────────────────────────────────
 function fmtDate(ds){
   var d = new Date(ds);
+  if(isNaN(d.getTime())) return '未知日期';
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function fmtTime(ds){
   var d = new Date(ds);
+  if(isNaN(d.getTime())) return '--:--';
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
 function fmtFull(ds){
   var d = new Date(ds);
+  if(isNaN(d.getTime())) d = new Date();
   var days = ['周日','周一','周二','周三','周四','周五','周六'];
   return {
     year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(),
@@ -402,19 +395,14 @@ function fmtFull(ds){
   };
 }
 var MZ = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
-
-function esc(s){
-  var d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
+function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 
 // ── Notes ────────────────────────────────────────────────────
 function loadNotes(){
   try{ S.notes = JSON.parse(localStorage.getItem('pd_notes')||'{}'); }catch(e){S.notes={}}
 }
 function saveNotes(){
-  localStorage.setItem('pd_notes', JSON.stringify(S.notes));
+  try{ localStorage.setItem('pd_notes', JSON.stringify(S.notes)); }catch(e){}
 }
 
 // ── IndexedDB ────────────────────────────────────────────────
@@ -431,12 +419,12 @@ function openDB(){
   });
 }
 
-function saveToDB(pid, blob, thumbBlob){
+function saveToDB(pid, blob, thumbBase64){
   return openDB().then(function(db){
     return new Promise(function(ok,no){
       var tx = db.transaction(['photos','thumbs'],'readwrite');
       tx.objectStore('photos').put({id:pid, blob:blob});
-      if(thumbBlob) tx.objectStore('thumbs').put({id:pid, blob:thumbBlob});
+      if(thumbBase64) tx.objectStore('thumbs').put({id:pid, b64:thumbBase64});
       tx.oncomplete = function(){ok()};
       tx.onerror = function(e){no(e.target.error)};
     });
@@ -447,10 +435,10 @@ function loadMetaFromStorage(){
   try{ return JSON.parse(localStorage.getItem('pd_meta')||'{}'); }catch(e){return{}}
 }
 function saveMetaToStorage(meta){
-  localStorage.setItem('pd_meta', JSON.stringify(meta));
+  try{ localStorage.setItem('pd_meta', JSON.stringify(meta)); }catch(e){}
 }
 
-// ── Load saved photos from IndexedDB ─────────────────────────
+// ── Load saved photos — 数据清洗 + base64 缩略图 ────────────
 function loadSavedPhotos(){
   var metaStore = loadMetaFromStorage();
   return openDB().then(function(db){
@@ -463,18 +451,26 @@ function loadSavedPhotos(){
       tReq.onsuccess=function(e){tData=e.target.result||[]};
       tx.oncomplete=function(){
         var tMap={};
-        tData.forEach(function(t){tMap[t.id]=t.blob});
+        tData.forEach(function(t){tMap[t.id]=t.b64||''});
         var photos=[];
         pData.forEach(function(r){
-          var m = metaStore[r.id] || {};
-          var url = URL.createObjectURL(r.blob);
-          var tUrl = tMap[r.id] ? URL.createObjectURL(tMap[r.id]) : '';
-          photos.push({
-            id: r.id, filename: m.fn||'IMG.jpg', size: m.sz||r.blob.size,
-            datetime: m.dt||new Date().toISOString(),
-            lat: m.lat, lon: m.lon, camera: m.cam,
-            url: url, thumbUrl: tUrl
-          });
+          try{
+            var m = metaStore[r.id] || {};
+            var p = normalizePhoto({
+              id: r.id,
+              filename: m.fn||'IMG.jpg',
+              size: m.sz||r.blob.size,
+              datetime: m.dt||new Date().toISOString(),
+              lat: m.lat, lng: m.lon,
+              camera: m.cam,
+            });
+            if(!p) return;
+            // 缩略图优先用存储的 base64，否则从 IndexedDB 取，都没有则用原图 blob
+            p.thumbUrl = m.tb64 || tMap[r.id] || '';
+            // 原图 blob URL（当前会话有效）
+            p.url = r.blob ? URL.createObjectURL(r.blob) : (p.thumbUrl || '');
+            photos.push(p);
+          }catch(e){ console.warn('Load photo failed:', r.id, e); }
         });
         ok(photos);
       };
@@ -529,28 +525,28 @@ function readGPS(v,gs,le,res){
   var cnt=r16(0);
   for(var i=0;i<cnt;i++){
     var e=2+i*12, tag=r16(e), vo=e+8;
-    function rat(o){return r32(o)/r32(o+4)}
-    if(tag===2){res.glat=rat(vo)+rat(vo+8)/60+rat(vo+16)/3600}
-    if(tag===4){res.glon=rat(vo)+rat(vo+8)/60+rat(vo+16)/3600}
+    function rat(o){var d=r32(o+4);return d!==0?r32(o)/d:NaN}
+    if(tag===2){var a=rat(vo),b=rat(vo+8),c=rat(vo+16);res.glat=a+b/60+c/3600}
+    if(tag===4){var a2=rat(vo),b2=rat(vo+8),c2=rat(vo+16);res.glon=a2+b2/60+c2/3600}
     if(tag===1&&v.getUint8(gs+vo)===('S').charCodeAt(0))res.glatR='S'
     if(tag===3&&v.getUint8(gs+vo)===('W').charCodeAt(0))res.glonR='W'
   }
 }
 
-// ── Thumbnail Generator ──────────────────────────────────────
+// ── Thumbnail Generator (returns base64 data URL) ───────────
 function makeThumb(blob, maxSize){
   maxSize = maxSize || 600;
   return new Promise(function(ok,no){
-    var img = new Image();
-    var url = URL.createObjectURL(blob);
+    var img = new Image(), url = URL.createObjectURL(blob);
     img.onload = function(){
       URL.revokeObjectURL(url);
       var w=img.width, h=img.height, ori=1;
-      // read orientation from EXIF
       var reader = new FileReader();
       reader.onload = function(){
-        var exif = readExif(reader.result);
-        if(exif && exif.ori) ori = exif.ori;
+        try{
+          var exif = readExif(reader.result);
+          if(exif && exif.ori) ori = exif.ori;
+        }catch(e){}
         if(w>h){if(w>maxSize){h=h*maxSize/w;w=maxSize}}
         else{if(h>maxSize){w=w*maxSize/h;h=maxSize}}
         w=Math.round(w); h=Math.round(h);
@@ -567,7 +563,7 @@ function makeThumb(blob, maxSize){
         }
         ctx.drawImage(img,0,0,w,h);
         ctx.restore();
-        c.toBlob(function(b){ok({blob:b,w:c.width,h:c.height})},'image/jpeg',0.8);
+        ok(c.toDataURL('image/jpeg',0.8));
       };
       reader.readAsArrayBuffer(blob.slice(0,65536));
     };
@@ -592,20 +588,17 @@ function indexPhotos(){
 }
 
 function updateStats(){
-  var gps = S.photos.filter(function(p){return p.lat}).length;
+  var gps = 0;
+  S.photos.forEach(function(p){if(p.hasLocation || (isValidCoord(p.lat,p.lng))) gps++});
   D.stats.textContent = S.photos.length+' 张 · '+S.dates.length+' 天 · '+gps+' 位置';
 }
 
-// ── Lazy image loading observer ─────────────────────────────
 function initObserver(){
   S.imgObserver = new IntersectionObserver(function(entries){
     entries.forEach(function(e){
       if(e.isIntersecting){
         var imgs = e.target.querySelectorAll('img[data-src]');
-        imgs.forEach(function(img){
-          img.src = img.dataset.src;
-          img.removeAttribute('data-src');
-        });
+        imgs.forEach(function(img){ img.src = img.dataset.src; img.removeAttribute('data-src'); });
         S.imgObserver.unobserve(e.target);
       }
     });
@@ -617,7 +610,6 @@ function renderTimeline(q){
   q = q || D.search.value;
   D.timeline.innerHTML = '';
   var dates=S.dates, byDate=S.byDate;
-
   if(q.trim()){
     var ql = q.toLowerCase();
     byDate={}; dates=[];
@@ -625,8 +617,7 @@ function renderTimeline(q){
       var f = S.byDate[dk].filter(function(p){
         if(p.filename.toLowerCase().indexOf(ql)>=0) return true;
         if(p.camera && p.camera.toLowerCase().indexOf(ql)>=0) return true;
-        var n = S.notes[p.id];
-        if(n && n.toLowerCase().indexOf(ql)>=0) return true;
+        var n = S.notes[p.id]; if(n && n.toLowerCase().indexOf(ql)>=0) return true;
         if(fmtDate(p.datetime).indexOf(ql)>=0) return true;
         if(dk.indexOf(ql)>=0) return true;
         return false;
@@ -642,62 +633,41 @@ function renderTimeline(q){
   }
 
   dates.forEach(function(dk){
-    var ps = byDate[dk];
-    var dt = ps[0]._di;
-    var blk = document.createElement('div');
-    blk.className = 'date-block';
+    var ps = byDate[dk], dt = ps[0]._di;
+    var blk = document.createElement('div'); blk.className = 'date-block';
     blk.innerHTML = '<div class="date-head" id="d-'+dk+'"><div class="date-num">'+dt.day+'</div><div class="date-meta"><div class="date-month">'+MZ[dt.month-1]+' '+dt.year+'</div><div class="date-weekday">'+dt.weekday+'</div></div><div class="date-count">'+ps.length+' 张</div></div>';
-
-    var grid = document.createElement('div');
-    grid.className = 'photo-grid';
+    var grid = document.createElement('div'); grid.className = 'photo-grid';
     ps.forEach(function(p){
-      var c = document.createElement('div');
-      c.className = 'photo-card';
+      var c = document.createElement('div'); c.className = 'photo-card';
       if(S.notes[p.id]) c.classList.add('has-note');
       c.dataset.idx = p._idx;
       var src = p.thumbUrl || p.url;
       c.innerHTML = '<img data-src="'+src+'" alt="'+esc(p.filename)+'"><div class="card-time">'+fmtTime(p.datetime)+'</div>'+
-        (p.lat?'<div class="gps-dot" title="有位置">📍</div>':'')+
+        ((p.hasLocation || isValidCoord(p.lat,p.lng))?'<div class="gps-dot" title="有位置">📍</div>':'')+
         (S.notes[p.id]?'<div class="note-dot"></div>':'');
       c.addEventListener('click', function(){openModal(p._idx)});
-      grid.appendChild(c);
-      S.imgObserver.observe(c);
+      grid.appendChild(c); S.imgObserver.observe(c);
     });
-    blk.appendChild(grid);
-    D.timeline.appendChild(blk);
+    blk.appendChild(grid); D.timeline.appendChild(blk);
   });
 }
 
 // ── 高德地图 ─────────────────────────────────────────────────
 function initMap(){
-  // 等待 高德 API 加载
-  if(typeof AMap === 'undefined'){
-    setTimeout(initMap, 500);
-    return;
-  }
+  if(typeof AMap === 'undefined'){setTimeout(initMap,500);return}
   if(S.map) return;
-
-  S.map = new AMap.Map('map-container', {
-    center: [105, 35],
-    zoom: 4,
-    resizeEnable: true,
-    dragEnable: true,
-    zoomEnable: true,
-    doubleClickZoom: true,
-    keyboard: false,
-  });
-
-  addMapMarkers();
-  fitMapBounds();
+  S.map = new AMap.Map('map-container', {center:[105,35],zoom:4,resizeEnable:true,dragEnable:true,zoomEnable:true,doubleClickZoom:true,keyboard:false});
+  addMapMarkers(); fitMapBounds();
 }
 
 function addMapMarkers(q){
   if(!S.map) return;
   q = q || D.search.value;
   S.map.clearMap();
-  if(S.cluster){S.cluster.clearMarkers(); S.map.remove(S.cluster)}
+  if(S.cluster){try{S.cluster.clearMarkers();S.map.remove(S.cluster)}catch(e){}}
 
-  var photos = S.photos.filter(function(p){return p.lat && p.lon});
+  // ★ 关键修复：只取有效坐标的照片
+  var photos = S.photos.filter(function(p){return isValidCoord(p.lat, p.lng)});
   if(q.trim()){
     var ql = q.toLowerCase();
     photos = photos.filter(function(p){
@@ -707,24 +677,17 @@ function addMapMarkers(q){
       return false;
     });
   }
-
   if(photos.length === 0) return;
 
-  // Group by location
   var groups = {};
   photos.forEach(function(p){
-    var k = p.lat.toFixed(4)+','+p.lon.toFixed(4);
-    if(!groups[k]) groups[k] = [];
-    groups[k].push(p);
+    var k = p.lat.toFixed(4)+','+p.lng.toFixed(4);
+    if(!groups[k]) groups[k] = []; groups[k].push(p);
   });
 
   var markers = [];
   Object.keys(groups).forEach(function(k){
-    var g = groups[k];
-    var ll = k.split(',').map(Number);
-    var cnt = g.length;
-    var first = g[0];
-    var dt = fmtFull(first.datetime);
+    var g = groups[k], ll = k.split(',').map(Number), cnt = g.length, first = g[0], dt = fmtFull(first.datetime);
 
     var content = '<div style="min-width:160px;max-width:260px;font-size:0.8rem;line-height:1.6">';
     var src = first.thumbUrl || first.url;
@@ -734,112 +697,69 @@ function addMapMarkers(q){
     content += '<button onclick="viewLocPhotos(\''+k+'\')" style="margin-top:6px;padding:3px 12px;background:#7c3aed;color:#fff;border:none;border-radius:12px;font-size:0.72rem;cursor:pointer">查看全部</button>';
     content += '</div>';
 
-    var marker = new AMap.Marker({
-      position: [ll[1], ll[0]], // 高德: [lng, lat]
-      title: dt.dateKey,
-      zIndex: 100,
-    });
-    marker._group = g;
-    marker._locKey = k;
-
-    // InfoWindow on click
+    var marker = new AMap.Marker({ position: [ll[1], ll[0]], title: dt.dateKey, zIndex: 100 }); // ★ [lng, lat]
+    marker._group = g; marker._locKey = k;
     marker.on('click', function(){
-      if(marker._iw){
-        marker._iw.open(S.map, marker.getPosition());
-      }else{
-        marker._iw = new AMap.InfoWindow({
-          content: content,
-          offset: new AMap.Pixel(0, -30),
-        });
-        marker._iw.open(S.map, marker.getPosition());
-      }
+      if(marker._iw){marker._iw.open(S.map, marker.getPosition())}
+      else{marker._iw = new AMap.InfoWindow({content:content,offset:new AMap.Pixel(0,-30)});marker._iw.open(S.map, marker.getPosition())}
     });
-
     markers.push(marker);
   });
 
-  // MarkerClusterer
   if(markers.length > 0){
     S.cluster = new AMap.MarkerClusterer(S.map, markers, {
-      gridSize: 80,
-      maxZoom: 18,
-      averageCenter: true,
-      styles: [
-        {url:'', size:{width:40,height:40}, textColor:'#fff', textSize:13,
-         style:'background:rgba(124,58,237,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600'},
-        {url:'', size:{width:48,height:48}, textColor:'#fff', textSize:14,
-         style:'background:rgba(0,212,255,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600'},
-        {url:'', size:{width:56,height:56}, textColor:'#fff', textSize:15,
-         style:'background:rgba(236,72,153,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600'},
+      gridSize:80, maxZoom:18, averageCenter:true,
+      styles:[
+        {url:'',size:{width:40,height:40},textColor:'#fff',textSize:13,style:'background:rgba(124,58,237,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600'},
+        {url:'',size:{width:48,height:48},textColor:'#fff',textSize:14,style:'background:rgba(0,212,255,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600'},
+        {url:'',size:{width:56,height:56},textColor:'#fff',textSize:15,style:'background:rgba(236,72,153,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600'}
       ]
     });
   }
 }
 
 function fitMapBounds(){
-  var withGPS = S.photos.filter(function(p){return p.lat && p.lon});
+  var withGPS = S.photos.filter(function(p){return isValidCoord(p.lat,p.lng)});
   if(withGPS.length === 0) return;
-  if(withGPS.length === 1){
-    S.map.setZoomAndCenter(14, [withGPS[0].lon, withGPS[0].lat]);
-  }else{
-    S.map.setFitView(null, false, [80,80,80,80]);
-  }
+  if(withGPS.length === 1){ S.map.setZoomAndCenter(14, [withGPS[0].lng, withGPS[0].lat]); }
+  else{ S.map.setFitView(null, false, [80,80,80,80]); }
 }
 
 function viewLocPhotos(k){
-  // Switch to timeline and filter by location
   switchView('timeline');
   var ll = k.split(',').map(Number);
   var photos = S.photos.filter(function(p){
-    return p.lat && p.lon && p.lat.toFixed(4)===ll[0].toFixed(4) && p.lon.toFixed(4)===ll[1].toFixed(4);
+    return isValidCoord(p.lat,p.lng) && p.lat.toFixed(4)===ll[0].toFixed(4) && p.lng.toFixed(4)===ll[1].toFixed(4);
   });
   if(photos.length > 0){
     renderLocFilter(photos, k);
-    setTimeout(function(){
-      var el = document.getElementById('d-'+photos[0]._dk);
-      if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
-    },200);
+    setTimeout(function(){var el=document.getElementById('d-'+photos[0]._dk);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},200);
   }
 }
 
 function renderLocFilter(photos, locKey){
-  var byDate = {};
-  photos.forEach(function(p){
-    if(!byDate[p._dk]) byDate[p._dk]=[];
-    byDate[p._dk].push(p);
-  });
-  S.filtered = photos;
-  D.timeline.innerHTML = '';
-
+  var byDate = {}; photos.forEach(function(p){if(!byDate[p._dk])byDate[p._dk]=[];byDate[p._dk].push(p)});
+  S.filtered = photos; D.timeline.innerHTML = '';
   var banner = document.createElement('div');
   banner.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);border-radius:12px;margin-bottom:18px;font-size:0.8rem;color:var(--text2)';
   var ll = (locKey||'0,0').split(',').map(Number);
   banner.innerHTML = '<span>📍 此位置 '+photos.length+' 张照片 ('+ll[0].toFixed(4)+','+ll[1].toFixed(4)+')</span><button id="clr-loc" style="margin-left:auto;padding:5px 12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--text);border-radius:16px;cursor:pointer;font-size:0.75rem">✕ 清除</button>';
   D.timeline.appendChild(banner);
   banner.querySelector('#clr-loc').addEventListener('click',function(){renderTimeline('')});
-
   var dates = Object.keys(byDate).sort();
   dates.forEach(function(dk){
-    var ps = byDate[dk];
-    var dt = ps[0]._di;
-    var blk = document.createElement('div');
-    blk.className = 'date-block';
+    var ps = byDate[dk], dt = ps[0]._di;
+    var blk = document.createElement('div'); blk.className = 'date-block';
     blk.innerHTML = '<div class="date-head" id="d-'+dk+'"><div class="date-num">'+dt.day+'</div><div class="date-meta"><div class="date-month">'+MZ[dt.month-1]+' '+dt.year+'</div><div class="date-weekday">'+dt.weekday+'</div></div><div class="date-count">'+ps.length+' 张</div></div>';
-
-    var grid = document.createElement('div');
-    grid.className = 'photo-grid';
+    var grid = document.createElement('div'); grid.className = 'photo-grid';
     ps.forEach(function(p){
-      var c = document.createElement('div');
-      c.className = 'photo-card';
-      if(S.notes[p.id]) c.classList.add('has-note');
-      c.dataset.idx = p._idx;
+      var c = document.createElement('div'); c.className = 'photo-card';
+      if(S.notes[p.id]) c.classList.add('has-note'); c.dataset.idx = p._idx;
       c.innerHTML = '<img data-src="'+(p.thumbUrl||p.url)+'" alt="'+esc(p.filename)+'"><div class="card-time">'+fmtTime(p.datetime)+'</div>'+(S.notes[p.id]?'<div class="note-dot"></div>':'');
       c.addEventListener('click',function(){openModal(p._idx)});
-      grid.appendChild(c);
-      S.imgObserver.observe(c);
+      grid.appendChild(c); S.imgObserver.observe(c);
     });
-    blk.appendChild(grid);
-    D.timeline.appendChild(blk);
+    blk.appendChild(grid); D.timeline.appendChild(blk);
   });
 }
 
@@ -855,76 +775,50 @@ function switchView(v){
     D.mapView.classList.add('active');
     document.querySelector('[data-view="map"]').classList.add('active');
     if(!S.map) initMap();
-    else{
-      setTimeout(function(){S.map.setFitView(null,false,[80,80,80,80])},200);
-      addMapMarkers();
-    }
+    else{setTimeout(function(){S.map.setFitView(null,false,[80,80,80,80])},200);addMapMarkers();}
   }
 }
 
 // ── Photo Modal ─────────────────────────────────────────────
 function openModal(idx){
   S.curIdx = idx;
-  var p = S.photos[idx];
-  if(!p) return;
-
-  D.modalImg.src = p.url;
-  D.modalImg.alt = p.filename;
+  var p = S.photos[idx]; if(!p) return;
+  D.modalImg.src = p.url; D.modalImg.alt = p.filename;
   var dt = fmtFull(p.datetime);
   D.modalDate.textContent = dt.year+'年'+dt.month+'月'+dt.day+'日';
   D.modalTime.textContent = fmtTime(p.datetime);
   D.modalCamera.textContent = p.camera || '未知';
-  D.noteInput.value = S.notes[p.id] || '';
-  D.noteSaved.style.opacity = '0';
+  D.noteInput.value = S.notes[p.id] || ''; D.noteSaved.style.opacity = '0';
 
-  if(p.lat && p.lon){
-    D.modalLoc.textContent = p.lat.toFixed(4)+', '+p.lon.toFixed(4);
+  // ★ 安全显示 GPS
+  if(p.hasLocation || isValidCoord(p.lat, p.lng)){
+    D.modalLoc.textContent = Number(p.lat).toFixed(6)+', '+Number(p.lng).toFixed(6);
     D.modalMinimap.style.display = 'block';
-    setTimeout(function(){renderMinimap(p.lat, p.lon)}, 350);
+    setTimeout(function(){renderMinimap(p.lat, p.lng)}, 350);
   }else{
     D.modalLoc.textContent = '无位置信息';
     D.modalMinimap.style.display = 'none';
   }
-
-  D.modal.classList.add('open');
-  document.body.style.overflow = 'hidden';
-  updateNav();
+  D.modal.classList.add('open'); document.body.style.overflow = 'hidden'; updateNav();
 }
 
 function closeModal(){
-  D.modal.classList.remove('open');
-  document.body.style.overflow = '';
-  if(S.minimap){S.minimap.destroy();S.minimap=null}
+  D.modal.classList.remove('open'); document.body.style.overflow = '';
+  if(S.minimap){try{S.minimap.destroy()}catch(e){};S.minimap=null}
 }
 
 function renderMinimap(lat, lon){
-  if(S.minimap){S.minimap.destroy();S.minimap=null}
-  D.modalMinimap.innerHTML = '';
-  D.modalMinimap.style.display = 'block';
-
+  if(!isValidCoord(lat,lon)){D.modalMinimap.style.display='none';return}
+  if(S.minimap){try{S.minimap.destroy()}catch(e){};S.minimap=null}
+  D.modalMinimap.innerHTML = ''; D.modalMinimap.style.display = 'block';
   if(window.innerWidth < 400){D.modalMinimap.style.display='none';return}
-
   var rect = D.modalMinimap.getBoundingClientRect();
-  if(rect.width < 10 || rect.height < 10){
-    setTimeout(function(){renderMinimap(lat,lon)},200);
-    return;
-  }
-
+  if(rect.width < 10 || rect.height < 10){setTimeout(function(){renderMinimap(lat,lon)},200);return}
   S.minimap = new AMap.Map(D.modalMinimap, {
-    center: [lon, lat],
-    zoom: 14,
-    resizeEnable: true,
-    dragEnable: false,
-    zoomEnable: false,
-    doubleClickZoom: false,
-    keyboard: false,
-    scrollWheel: false,
+    center: [lon, lat], zoom: 14, resizeEnable: true,
+    dragEnable: false, zoomEnable: false, doubleClickZoom: false, keyboard: false, scrollWheel: false,
   });
-
-  new AMap.Marker({
-    position: [lon, lat],
-    map: S.minimap,
-  });
+  new AMap.Marker({ position: [lon, lat], map: S.minimap });
 }
 
 function updateNav(){
@@ -944,12 +838,8 @@ function navModal(dir){
 // ── Photo Import ─────────────────────────────────────────────
 function startImport(){
   var input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.multiple = true;
-  input.onchange = function(){
-    if(input.files.length > 0) processImport(input.files);
-  };
+  input.type='file'; input.accept='image/*'; input.multiple=true;
+  input.onchange = function(){if(input.files.length>0)processImport(input.files)};
   input.click();
 }
 
@@ -961,176 +851,106 @@ async function processImport(files){
 
   for(var i=0;i<total;i++){
     var file = files[i];
-    try {
-      // Read EXIF
-      var exif = null;
-      var buf = await file.slice(0,131072).arrayBuffer();
-      exif = readExif(buf);
+    try{
+      var buf = await file.slice(0,131072).arrayBuffer(), exif = readExif(buf);
 
-      // Determine datetime
       var dt = new Date();
-      if(exif && exif.dt){
-        var dts = exif.dt.replace(/:/,'-').replace(/:/,'-');
-        var parsed = new Date(dts);
-        if(!isNaN(parsed.getTime())) dt = parsed;
-      }
+      if(exif && exif.dt){ var dts = exif.dt.replace(/:/,'-').replace(/:/,'-'), parsed = new Date(dts);
+        if(!isNaN(parsed.getTime())) dt = parsed; }
 
-      // Generate thumbnail
-      var thumb = await makeThumb(file, 600);
+      // ★ 缩略图存为 base64 data URL
+      var thumbB64 = await makeThumb(file, 600);
       var pid = 'p_'+Date.now()+'_'+i;
 
-      // GPS
-      var lat=null, lon=null;
-      if(exif && exif.glat!==undefined){
-        lat = exif.glat;
-        if(exif.glatR==='S') lat=-lat;
-        lon = exif.glon;
-        if(exif.glonR==='W') lon=-lon;
+      // ★ GPS 验证
+      var lat=null, lng=null;
+      if(exif && exif.glat!==undefined && exif.glon!==undefined){
+        lat = exif.glat; if(exif.glatR==='S') lat=-lat;
+        lng = exif.glon; if(exif.glonR==='W') lng=-lng;
+        if(!isValidCoord(lat, lng)){ lat=null; lng=null; }
       }
 
-      // Camera
       var cam = null;
-      if(exif && (exif.make||exif.model)){
-        cam = (exif.make+' '+(exif.model||'')).trim();
-      }
+      if(exif && (exif.make||exif.model)) cam = (exif.make+' '+(exif.model||'')).trim();
 
-      // Save blob to IndexedDB
-      await saveToDB(pid, file, thumb.blob);
+      // 存 blob 到 IndexedDB + base64 缩略图
+      await saveToDB(pid, file, thumbB64);
 
-      // Save metadata
-      metaStore[pid] = {fn:file.name, dt:dt.toISOString(), sz:file.size, lat:lat, lon:lon, cam:cam};
+      // 存元数据（含 base64 缩略图）
+      metaStore[pid] = {
+        fn:file.name, dt:dt.toISOString(), sz:file.size,
+        lat:lat, lon:lng, cam:cam, tb64:thumbB64
+      };
       saveMetaToStorage(metaStore);
 
-      // Add to in-memory state
       var url = URL.createObjectURL(file);
-      var tUrl = URL.createObjectURL(thumb.blob);
-      var pObj = {
-        id: pid, filename: file.name, size: file.size,
-        datetime: dt.toISOString(),
-        lat: lat ? parseFloat(lat.toFixed(6)) : undefined,
-        lon: lon ? parseFloat(lon.toFixed(6)) : undefined,
-        camera: cam, url: url, thumbUrl: tUrl
-      };
+      var pObj = normalizePhoto({
+        id:pid, filename:file.name, size:file.size,
+        datetime:dt.toISOString(), lat:lat, lng:lng, camera:cam
+      });
+      pObj.url = url; pObj.thumbUrl = thumbB64;
       newPhotos.push(pObj);
 
-    }catch(err){
-      console.warn('Import failed for', file.name, err);
-    }
+    }catch(err){ console.warn('Import fail:', file.name, err); }
 
-    // Update progress
     var pct = Math.round((i+1)/total*100);
     D.progressFill.style.width = pct+'%';
     D.progressText.textContent = (i+1)+'/'+total;
   }
 
-  // Merge into state
   S.photos = S.photos.concat(newPhotos);
-  indexPhotos();
-  renderTimeline('');
-  updateStats();
-
+  indexPhotos(); renderTimeline(''); updateStats();
   D.progress.classList.remove('show');
-
-  // Toast
   showToast('✓ 已导入 '+newPhotos.length+' 张照片');
 }
 
 function showToast(msg){
-  D.toast.textContent = msg;
-  D.toast.classList.add('show');
+  D.toast.textContent = msg; D.toast.classList.add('show');
   setTimeout(function(){D.toast.classList.remove('show')}, 2500);
 }
 
 // ── Event Listeners ─────────────────────────────────────────
 function bindEvents(){
-  // View tabs
-  D.tabs.forEach(function(t){
-    t.addEventListener('click', function(){
-      switchView(t.dataset.view);
-    });
-  });
-
-  // Search
-  var searchTimer;
-  D.search.addEventListener('input', function(){
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(function(){
-      if(S.view==='timeline') renderTimeline();
-      else addMapMarkers();
-    }, 250);
-  });
-
-  // Import button
+  D.tabs.forEach(function(t){ t.addEventListener('click',function(){switchView(t.dataset.view)}); });
+  var st; D.search.addEventListener('input',function(){clearTimeout(st);st=setTimeout(function(){if(S.view==='timeline')renderTimeline();else addMapMarkers()},250)});
   D.importBtn.addEventListener('click', startImport);
-
-  // Modal
-  D.modal.addEventListener('click', function(e){
-    if(e.target === D.modal) closeModal();
+  D.modal.addEventListener('click',function(e){if(e.target===D.modal)closeModal()});
+  document.getElementById('modal-close').addEventListener('click',closeModal);
+  document.querySelector('.modal-nav.prev').addEventListener('click',function(){navModal(-1)});
+  document.querySelector('.modal-nav.next').addEventListener('click',function(){navModal(1)});
+  D.noteSave.addEventListener('click',function(){
+    var p=S.photos[S.curIdx]; if(!p)return;
+    var note=D.noteInput.value.trim(); if(note)S.notes[p.id]=note;else delete S.notes[p.id];
+    saveNotes(); D.noteSaved.style.opacity='1';
+    setTimeout(function(){D.noteSaved.style.opacity='0'},1500);
+    if(S.view==='timeline')renderTimeline('');
   });
-  document.getElementById('modal-close').addEventListener('click', closeModal);
-  document.querySelector('.modal-nav.prev').addEventListener('click', function(){navModal(-1)});
-  document.querySelector('.modal-nav.next').addEventListener('click', function(){navModal(1)});
-
-  D.noteSave.addEventListener('click', function(){
-    var p = S.photos[S.curIdx];
-    if(!p) return;
-    var note = D.noteInput.value.trim();
-    if(note) S.notes[p.id] = note;
-    else delete S.notes[p.id];
-    saveNotes();
-    D.noteSaved.style.opacity = '1';
-    setTimeout(function(){D.noteSaved.style.opacity='0'}, 1500);
-    if(S.view==='timeline') renderTimeline('');
+  document.addEventListener('keydown',function(e){
+    if(!D.modal.classList.contains('open'))return;
+    if(e.key==='Escape')closeModal();
+    if(e.key==='ArrowLeft')navModal(-1);
+    if(e.key==='ArrowRight')navModal(1);
   });
-
-  // Keyboard
-  document.addEventListener('keydown', function(e){
-    if(!D.modal.classList.contains('open')) return;
-    if(e.key==='Escape') closeModal();
-    if(e.key==='ArrowLeft') navModal(-1);
-    if(e.key==='ArrowRight') navModal(1);
-  });
-
-  // Online/offline
-  window.addEventListener('online', function(){
-    S.isOnline = true;
-    D.offlineBanner.classList.remove('show');
-  });
-  window.addEventListener('offline', function(){
-    S.isOnline = false;
-    D.offlineBanner.classList.add('show');
-  });
+  window.addEventListener('online',function(){S.isOnline=true;D.offlineBanner.classList.remove('show')});
+  window.addEventListener('offline',function(){S.isOnline=false;D.offlineBanner.classList.add('show')});
 }
 
 // ── Init ─────────────────────────────────────────────────────
 async function initApp(){
-  initDom();
-  bindEvents();
-  initObserver();
-  loadNotes();
-
+  initDom(); bindEvents(); initObserver(); loadNotes();
   D.loadingText.textContent = '正在加载本地照片...';
-
-  // Load saved photos from IndexedDB
   try{
     var saved = await loadSavedPhotos();
-    if(saved.length > 0){
-      S.photos = saved;
-      D.loadingText.textContent = '已加载 '+saved.length+' 张照片';
-    }
-  }catch(e){
-    console.warn('DB load failed:', e);
-  }
+    if(saved.length > 0){ S.photos = saved;
+      D.loadingText.textContent = '已加载 '+saved.length+' 张照片'; }
+  }catch(e){ console.warn('DB load failed:', e); }
 
   indexPhotos();
   D.loading.classList.add('hidden');
 
   if(S.photos.length === 0){
     D.timeline.innerHTML = '<div class="empty-state"><div class="empty-icon">📷</div><div class="empty-title">还没有照片</div><div class="empty-desc">点击右上角「+ 导入照片」<br>从手机相册批量导入</div></div>';
-  }else{
-    renderTimeline('');
-  }
-
+  }else{ renderTimeline(''); }
   updateStats();
   if(!S.isOnline) D.offlineBanner.classList.add('show');
 }
