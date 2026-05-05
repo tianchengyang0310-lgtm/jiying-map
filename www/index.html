@@ -12,6 +12,7 @@
   --cyan:#00d4ff; --purple:#7c3aed; --pink:#ec4899;
   --glass:rgba(12,12,24,0.85); --glass-border:rgba(255,255,255,0.08);
   --r:8px; --rm:14px; --rl:20px; --rxl:28px;
+  --red:#ef4444; --green:#22c55e; --amber:#eab308;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{font-size:16px}
@@ -45,21 +46,22 @@ body::before{
   cursor:pointer;font-size:0.8rem;font-weight:500;transition:0.15s;white-space:nowrap;
 }
 .tab.active{background:rgba(255,255,255,0.1);color:var(--text)}
-#search-wrap{position:relative;flex:1;min-width:120px;max-width:280px}
+#search-wrap{position:relative;flex:1;min-width:100px;max-width:220px}
 #search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text3);pointer-events:none}
 #search{width:100%;padding:7px 10px 7px 32px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:18px;color:var(--text);font-size:0.8rem;outline:none}
 #search::placeholder{color:var(--text3)}
 #search:focus{border-color:var(--glow);box-shadow:0 0 0 3px rgba(0,212,255,0.1)}
-#stats{font-size:0.72rem;color:var(--text3);white-space:nowrap;font-family:monospace}
+#stats{font-size:0.7rem;color:var(--text3);white-space:nowrap;font-family:monospace}
 
-/* Import button */
-#import-btn{
-  padding:7px 16px;background:linear-gradient(135deg,var(--cyan),var(--purple));border:none;
-  border-radius:18px;color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;transition:0.15s;white-space:nowrap;
+#import-btn, #clear-btn{
+  padding:7px 14px;border:none;border-radius:18px;font-size:0.8rem;font-weight:600;cursor:pointer;transition:0.15s;white-space:nowrap;
 }
+#import-btn{background:linear-gradient(135deg,var(--cyan),var(--purple));color:#fff}
 #import-btn:active{opacity:0.8}
+#clear-btn{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.25)}
+#clear-btn:active{background:rgba(239,68,68,0.3)}
 
-/* Main content */
+/* Main */
 #main{flex:1;position:relative;overflow:hidden}
 .panel{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity 0.35s}
 .panel.active{opacity:1;pointer-events:auto}
@@ -80,7 +82,7 @@ body::before{
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
 }
 .date-meta{display:flex;flex-direction:column;gap:1px}
-.date-month{font-size:1rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em}
+.date-month{font-size:1rem;font-weight:600;color:var(--text2);letter-spacing:0.06em}
 .date-weekday{font-size:0.72rem;color:var(--text3);font-family:monospace}
 .date-count{margin-left:auto;font-size:0.72rem;color:var(--text3);font-family:monospace;background:var(--card);padding:3px 8px;border-radius:10px;border:1px solid var(--border)}
 
@@ -102,10 +104,12 @@ body::before{
   position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;
   background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:0.6rem;
 }
+.gps-dot.no-gps{color:var(--text3)}
 .note-dot{
   position:absolute;top:6px;left:6px;width:7px;height:7px;border-radius:50%;
   background:var(--purple);box-shadow:0 0 6px var(--purple);
 }
+.photo-card.has-note{border-color:rgba(124,58,237,0.3)}
 
 .empty-state{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -113,14 +117,20 @@ body::before{
 }
 .empty-icon{font-size:4rem;opacity:0.3}
 .empty-title{font-size:1.2rem;color:var(--text2);font-weight:600}
-.empty-desc{font-size:0.85rem;max-width:260px;line-height:1.6}
+.empty-desc{font-size:0.85rem;max-width:280px;line-height:1.6}
+
+.error-banner{
+  display:flex;align-items:center;gap:8px;padding:10px 14px;margin:0 14px 14px;
+  background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);
+  border-radius:var(--rm);font-size:0.78rem;color:var(--red);
+}
 
 /* Map */
 #map-container{width:100%;height:100%;background:#0a0a14}
 
 /* Modal */
 #modal{
-  position:fixed;inset:0;background:rgba(0,0,0,0.88);backdrop-filter:blur(12px);
+  position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(12px);
   z-index:1000;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity 0.3s;
 }
 #modal.open{opacity:1;pointer-events:auto}
@@ -144,9 +154,10 @@ body::before{
 }
 .modal-date-big{font-size:1.6rem;font-weight:700;background:linear-gradient(135deg,var(--text),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .modal-time-big{font-size:1.1rem;font-weight:300;color:var(--text2);font-family:monospace}
-.info-row{display:flex;justify-content:space-between;font-size:0.8rem;padding:3px 0}
-.info-label{color:var(--text3)}
-.info-value{color:var(--text2);font-family:monospace;text-align:right;max-width:60%}
+.info-row{display:flex;justify-content:space-between;font-size:0.8rem;padding:3px 0;flex-wrap:wrap;gap:4px}
+.info-label{color:var(--text3);white-space:nowrap}
+.info-value{color:var(--text2);font-family:monospace;text-align:right;max-width:65%;word-break:break-all}
+#modal-address{color:var(--cyan);font-family:inherit;text-align:left;max-width:100%}
 #modal-minimap{width:100%;height:100px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);margin-top:4px}
 #note-input{
   width:100%;min-height:60px;padding:10px;background:rgba(255,255,255,0.04);
@@ -168,28 +179,25 @@ body::before{
   display:flex;align-items:center;gap:12px;transform:translateY(100%);transition:transform 0.3s;
 }
 #import-progress.show{transform:translateY(0)}
-.progress-bar{
-  flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;
-}
+.progress-bar{flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden}
 .progress-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border-radius:2px;transition:width 0.2s}
 .progress-text{font-size:0.75rem;color:var(--text2);white-space:nowrap;font-family:monospace}
 
-/* Password */
-#pw-gate{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:10000}
-#pw-gate.hidden{display:none}
-#pw-input{
-  padding:10px 18px;background:rgba(255,255,255,0.05);border:1px solid var(--border);
-  border-radius:22px;color:var(--text);font-size:0.95rem;text-align:center;letter-spacing:0.3em;
-  width:160px;outline:none;font-family:monospace;
+/* Clear confirm dialog */
+#clear-confirm{
+  position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s;
 }
-#pw-input:focus{border-color:var(--glow);box-shadow:0 0 0 3px rgba(0,212,255,0.1)}
-#pw-submit{
-  padding:10px 28px;background:linear-gradient(135deg,var(--cyan),var(--purple));border:none;
-  border-radius:22px;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;
+#clear-confirm.show{opacity:1;pointer-events:auto}
+.clear-dialog{
+  background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--glass-border);
+  border-radius:var(--rl);padding:24px;max-width:320px;text-align:center;display:flex;flex-direction:column;gap:14px;
 }
-#pw-error{font-size:0.72rem;color:#ef4444;opacity:0;transition:opacity 0.3s}
-#pw-error.show{opacity:1}
-.pw-title{font-size:1.3rem;font-weight:700;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.clear-dialog h3{font-size:1.1rem;color:var(--red)}
+.clear-dialog p{font-size:0.82rem;color:var(--text2);line-height:1.5}
+.clear-btns{display:flex;gap:10px;justify-content:center}
+.clear-btns button{padding:8px 20px;border-radius:18px;border:none;font-size:0.8rem;font-weight:600;cursor:pointer}
+.btn-cancel{background:rgba(255,255,255,0.1);color:var(--text)}
+.btn-danger{background:rgba(239,68,68,0.8);color:#fff}
 
 /* Loading */
 #loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:9999;transition:opacity 0.5s}
@@ -205,6 +213,8 @@ body::before{
   border-radius:18px;font-size:0.82rem;z-index:3000;opacity:0;pointer-events:none;transition:opacity 0.3s;
 }
 .toast.show{opacity:1}
+.toast.warn{background:rgba(234,179,8,0.9)}
+.toast.err{background:rgba(239,68,68,0.9)}
 
 /* Offline banner */
 #offline-banner{
@@ -218,37 +228,29 @@ body::before{
 </head>
 <body>
 
-<!-- Password -->
-<div id="pw-gate">
-  <div class="pw-title">迹影地图</div>
-  <div style="font-size:0.82rem;color:var(--text3)">输入密码以查看照片</div>
-  <input type="password" id="pw-input" placeholder="····" maxlength="20" autofocus>
-  <button id="pw-submit">进入</button>
-  <div id="pw-error">密码错误，请重试</div>
-</div>
-
 <div id="loading">
   <div class="spinner"></div>
   <div id="loading-text">正在加载...</div>
 </div>
 
 <div id="app">
-  <div id="offline-banner">⚠️ 当前离线 — 地图需要网络</div>
+  <div id="offline-banner">离线 — 地图需要网络</div>
   <header id="header">
     <div id="logo">迹影地图</div>
     <div class="view-tabs">
-      <button class="tab active" data-view="timeline">📅 时间线</button>
-      <button class="tab" data-view="map">🗺️ 地图</button>
+      <button class="tab active" data-view="timeline">时间线</button>
+      <button class="tab" data-view="map">地图</button>
     </div>
     <div id="search-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input type="text" id="search" placeholder="搜索...">
     </div>
     <button id="import-btn">+ 导入照片</button>
+    <button id="clear-btn" title="清空本地数据">清空</button>
     <div id="stats"></div>
   </header>
   <main id="main">
-    <div id="timeline" class="panel active"></div>
+    <div id="timeline" class="panel active"><div id="timeline-inner"></div></div>
     <div id="map-view" class="panel"><div id="map-container"></div></div>
   </main>
 </div>
@@ -264,15 +266,16 @@ body::before{
   <div id="modal-info">
     <div class="modal-date-big" id="modal-date-big"></div>
     <div class="modal-time-big" id="modal-time-big"></div>
-    <div class="info-row"><span class="info-label">📷 相机</span><span class="info-value" id="modal-camera">-</span></div>
-    <div class="info-row"><span class="info-label">📍 GPS</span><span class="info-value" id="modal-location">-</span></div>
+    <div class="info-row"><span class="info-label">相机</span><span class="info-value" id="modal-camera">-</span></div>
+    <div class="info-row"><span class="info-label">位置</span><span class="info-value" id="modal-location">-</span></div>
+    <div class="info-row" id="modal-address-row" style="display:none"><span class="info-label">地址</span><span class="info-value" id="modal-address" style="color:var(--cyan)">-</span></div>
     <div id="modal-minimap"></div>
     <div>
-      <div class="info-row" style="margin-bottom:6px"><span class="info-label">✏️ 备注</span></div>
+      <div class="info-row" style="margin-bottom:6px"><span class="info-label">备注</span></div>
       <textarea id="note-input" placeholder="写下记忆..."></textarea>
       <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
         <button id="note-save">保存</button>
-        <span id="note-saved" style="font-size:0.72rem;color:#22c55e;opacity:0;transition:opacity 0.3s">✓ 已保存</span>
+        <span id="note-saved" style="font-size:0.72rem;color:#22c55e;opacity:0;transition:opacity 0.3s">已保存</span>
       </div>
     </div>
   </div>
@@ -280,9 +283,21 @@ body::before{
 
 <!-- Import Progress -->
 <div id="import-progress">
-  <span style="font-size:1.2rem">📷</span>
+  <span style="font-size:1.2rem">导入中</span>
   <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
   <span class="progress-text" id="progress-text">0/0</span>
+</div>
+
+<!-- Clear Confirmation -->
+<div id="clear-confirm">
+  <div class="clear-dialog">
+    <h3>清空所有数据？</h3>
+    <p>这将删除所有照片、缩略图和备注。此操作不可撤销。</p>
+    <div class="clear-btns">
+      <button class="btn-cancel" id="btn-cancel-clear">取消</button>
+      <button class="btn-danger" id="btn-confirm-clear">确认清空</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -294,303 +309,570 @@ body::before{
   };
   var _AMAP_KEY = '3a73a9f70779df270cb47445b0237b7b';
 </script>
-<script onerror="document.getElementById('loading-text').textContent='高德地图加载失败，请检查网络或API Key'" src="https://webapi.amap.com/maps?v=2.0&key=3a73a9f70779df270cb47445b0237b7b&plugin=AMap.MarkerClusterer"></script>
+<script onerror="document.getElementById('loading-text').textContent='高德地图加载失败，请检查网络'" src="https://webapi.amap.com/maps?v=2.0&key=3a73a9f70779df270cb47445b0237b7b&plugin=AMap.MarkerClusterer,AMap.Geocoder"></script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// 迹影地图 — 离线照片管理与地图浏览
+// 迹影地图 v2 — 离线照片管理与高德地图浏览
 // ═══════════════════════════════════════════════════════════════
 
-// ── Password Gate ────────────────────────────────────────────
-(function(){
-  var gate = document.getElementById('pw-gate');
-  var input = document.getElementById('pw-input');
-  var submit = document.getElementById('pw-submit');
-  var err = document.getElementById('pw-error');
-  async function unlock(){
-    var pw = input.value.trim();
-    var encoder = new TextEncoder();
-    var data = encoder.encode(pw);
-    var hash = await crypto.subtle.digest('SHA-256', data);
-    var hex = Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,'0')}).join('');
-    var stored = localStorage.getItem('_pwd_hash');
-    if(hex === stored || btoa(pw) === 'MDMyMw=='){ // 密码 0323
-      if(!stored) localStorage.setItem('_pwd_hash', hex);
-      gate.classList.add('hidden');
-      initApp();
-    }else{
-      err.classList.add('show'); input.value=''; input.focus();
-      setTimeout(function(){err.classList.remove('show')},2000);
-    }
-  }
-  submit.addEventListener('click', unlock);
-  input.addEventListener('keydown', function(e){if(e.key==='Enter') unlock();});
-  if(localStorage.getItem('_pwd_hash')){ gate.classList.add('hidden'); initApp(); }
-})();
-
-// ═══════════════════════════════════════════════════════════════
-// 全局状态
-// ═══════════════════════════════════════════════════════════════
-var S = {
-  photos: [], byDate: {}, dates: [], view: 'timeline', curIdx: -1,
-  map: null, cluster: null, minimap: null, notes: {}, filtered: null,
-  isOnline: navigator.onLine, imgObserver: null
-};
+// ── DOM refs ──────────────────────────────────────────────────
 var D = {};
 function $(s){return document.querySelector(s)}
 function initDom(){
   D.loading=$('#loading'); D.loadingText=$('#loading-text');
-  D.timeline=$('#timeline'); D.mapView=$('#map-view'); D.mapContainer=$('#map-container');
-  D.stats=$('#stats'); D.search=$('#search'); D.importBtn=$('#import-btn');
+  D.timeline=$('#timeline'); D.timelineInner=$('#timeline-inner');
+  D.mapView=$('#map-view'); D.mapContainer=$('#map-container');
+  D.stats=$('#stats'); D.search=$('#search');
+  D.importBtn=$('#import-btn'); D.clearBtn=$('#clear-btn');
   D.tabs=document.querySelectorAll('.tab'); D.modal=$('#modal'); D.modalImg=$('#modal-image');
   D.modalDate=$('#modal-date-big'); D.modalTime=$('#modal-time-big'); D.modalCamera=$('#modal-camera');
-  D.modalLoc=$('#modal-location'); D.modalMinimap=$('#modal-minimap');
+  D.modalLoc=$('#modal-location'); D.modalAddr=$('#modal-address'); D.modalAddrRow=$('#modal-address-row');
+  D.modalMinimap=$('#modal-minimap');
   D.noteInput=$('#note-input'); D.noteSave=$('#note-save'); D.noteSaved=$('#note-saved');
   D.progress=$('#import-progress'); D.progressFill=$('#progress-fill'); D.progressText=$('#progress-text');
   D.offlineBanner=$('#offline-banner'); D.toast=$('#toast');
+  D.clearConfirm=$('#clear-confirm');
 }
 
+// ── Global State ──────────────────────────────────────────────
+var S = {
+  photos: [],          // Photo objects
+  byDate: {},          // {dateKey: [photo, ...]}
+  dates: [],           // sorted date keys
+  view: 'timeline',
+  curIdx: -1,
+  map: null,
+  cluster: null,
+  minimap: null,
+  filtered: null,      // search/location filter results
+  isOnline: navigator.onLine,
+  imgObserver: null
+};
+var _fi = -1; // filtered index
+
 // ═══════════════════════════════════════════════════════════════
-// 坐标验证 — 核心修复：拒绝 Infinity / NaN / 越界值
+// 核心：坐标合法性校验
+// 杜绝 Infinity / NaN / 越界 / (0,0)
 // ═══════════════════════════════════════════════════════════════
-function isValidCoord(lat, lng){
-  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+function isValidCoordinate(lat, lng){
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lng) <= 180 &&
+    !(Math.abs(lat) < 0.000001 && Math.abs(lng) < 0.000001)
+  );
 }
-// 数据清洗：修复历史错误数据
+
+// ── 数据清洗：修复历史错误数据 ────────────────────────────────
 function normalizePhoto(p){
-  if(!p) return null;
-  var lat = Number(p.lat), lng = Number(p.lng);
-  var hasLoc = isValidCoord(lat, lng);
+  if(!p || typeof p !== 'object') return null;
+  var lat = Number(p.lat);
+  var lng = Number(p.lng);
+  var hasLoc = isValidCoordinate(lat, lng);
   return {
-    id: p.id, filename: p.filename||'IMG.jpg', size: p.size||0,
-    datetime: p.datetime||new Date().toISOString(),
+    id: p.id || ('p_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)),
+    imageData: p.imageData || p.url || p.src || null,
+    thumbnailData: p.thumbnailData || p.thumbUrl || '',
+    fileName: p.fileName || p.filename || 'IMG.jpg',
+    shootTime: p.shootTime || p.datetime || null,
+    importTime: p.importTime || new Date().toISOString(),
+    cameraMake: p.cameraMake || null,
+    cameraModel: p.cameraModel || null,
     lat: hasLoc ? lat : null,
     lng: hasLoc ? lng : null,
     hasLocation: hasLoc,
-    camera: p.camera || null,
-    url: p.url||'', thumbUrl: p.thumbUrl||'',
-    note: p.note||'',
+    address: p.address || null,
+    note: p.note || '',
+    _idx: p._idx !== undefined ? p._idx : -1
   };
 }
 
-// ── Utilities ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// 工具函数
+// ═══════════════════════════════════════════════════════════════
 function fmtDate(ds){
-  var d = new Date(ds);
-  if(isNaN(d.getTime())) return '未知日期';
+  try{ var d = new Date(ds); if(isNaN(d.getTime())) return '未知日期'; }
+  catch(e){ return '未知日期'; }
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function fmtTime(ds){
-  var d = new Date(ds);
-  if(isNaN(d.getTime())) return '--:--';
+  try{ var d = new Date(ds); if(isNaN(d.getTime())) return '--:--'; }
+  catch(e){ return '--:--'; }
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
 function fmtFull(ds){
-  var d = new Date(ds);
-  if(isNaN(d.getTime())) d = new Date();
-  var days = ['周日','周一','周二','周三','周四','周五','周六'];
+  try{ var d = new Date(ds); if(isNaN(d.getTime())) d = new Date(); }
+  catch(e){ d = new Date(); }
+  var wk = ['周日','周一','周二','周三','周四','周五','周六'];
   return {
     year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(),
-    weekday: days[d.getDay()],
+    weekday: wk[d.getDay()],
     dateKey: d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
   };
 }
-var MZ = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+var MONTHS = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 
-// ── Notes ────────────────────────────────────────────────────
-function loadNotes(){
-  try{ S.notes = JSON.parse(localStorage.getItem('pd_notes')||'{}'); }catch(e){S.notes={}}
-}
-function saveNotes(){
-  try{ localStorage.setItem('pd_notes', JSON.stringify(S.notes)); }catch(e){}
+function showToast(msg, type){
+  D.toast.textContent = msg;
+  D.toast.className = 'toast' + (type === 'warn' ? ' warn' : type === 'err' ? ' err' : '');
+  D.toast.classList.add('show');
+  setTimeout(function(){D.toast.classList.remove('show')}, 2500);
 }
 
-// ── IndexedDB ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// IndexedDB — 图片以 base64 存储
+// ═══════════════════════════════════════════════════════════════
+var DB_NAME = 'jiying_db';
+var DB_VERSION = 2;
+
 function openDB(){
-  return new Promise(function(ok,no){
-    var r = indexedDB.open('pd_db', 1);
+  return new Promise(function(ok, no){
+    var r = indexedDB.open(DB_NAME, DB_VERSION);
     r.onupgradeneeded = function(e){
       var db = e.target.result;
-      if(!db.objectStoreNames.contains('photos')) db.createObjectStore('photos',{keyPath:'id'});
-      if(!db.objectStoreNames.contains('thumbs')) db.createObjectStore('thumbs',{keyPath:'id'});
+      // v1 → v2: 改名并重建
+      if(!db.objectStoreNames.contains('images')) db.createObjectStore('images', {keyPath:'id'});
+      if(!db.objectStoreNames.contains('thumbs')) db.createObjectStore('thumbs', {keyPath:'id'});
+      // 删除旧 store（如果存在）
+      try{ if(db.objectStoreNames.contains('photos')) db.deleteObjectStore('photos'); }catch(e2){}
     };
-    r.onsuccess = function(e){ok(e.target.result)};
-    r.onerror = function(e){no(e.target.error)};
+    r.onsuccess = function(e){ ok(e.target.result); };
+    r.onerror = function(e){ no(e.target.error); };
   });
 }
 
-function saveToDB(pid, blob, thumbBase64){
+function saveImageToDB(pid, imageB64, thumbB64){
   return openDB().then(function(db){
-    return new Promise(function(ok,no){
-      var tx = db.transaction(['photos','thumbs'],'readwrite');
-      tx.objectStore('photos').put({id:pid, blob:blob});
-      if(thumbBase64) tx.objectStore('thumbs').put({id:pid, b64:thumbBase64});
-      tx.oncomplete = function(){ok()};
-      tx.onerror = function(e){no(e.target.error)};
+    return new Promise(function(ok, no){
+      var tx = db.transaction(['images','thumbs'], 'readwrite');
+      if(imageB64) tx.objectStore('images').put({id: pid, b64: imageB64});
+      if(thumbB64) tx.objectStore('thumbs').put({id: pid, b64: thumbB64});
+      tx.oncomplete = function(){ ok(); };
+      tx.onerror = function(e){ no(e.target.error); };
     });
   });
 }
 
-function loadMetaFromStorage(){
-  try{ return JSON.parse(localStorage.getItem('pd_meta')||'{}'); }catch(e){return{}}
-}
-function saveMetaToStorage(meta){
-  try{ localStorage.setItem('pd_meta', JSON.stringify(meta)); }catch(e){}
+// ═══════════════════════════════════════════════════════════════
+// 从 IndexedDB 加载图片 base64
+// ═══════════════════════════════════════════════════════════════
+function loadImagesFromDB(ids){
+  if(!ids || ids.length === 0) return Promise.resolve({images:{}, thumbs:{}});
+
+  var TIMEOUT_MS = 8000; // 8 秒超时，防止永久卡死
+
+  return new Promise(function(resolveAll){
+    var done = false;
+    var result = {images:{}, thumbs:{}};
+
+    // 超时保护 — 任何情况都必须在 8 秒内返回
+    var timer = setTimeout(function(){
+      if(!done){ done=true; console.warn('loadImagesFromDB timeout'); resolveAll(result); }
+    }, TIMEOUT_MS);
+
+    function finish(){
+      if(done) return;
+      done = true;
+      clearTimeout(timer);
+      resolveAll(result);
+    }
+
+    openDB().then(function(db){
+      if(done) return;
+      try{
+        var tx = db.transaction(['images','thumbs'], 'readonly');
+        var imgStore = tx.objectStore('images');
+        var thumbStore = tx.objectStore('thumbs');
+
+        tx.oncomplete = function(){ finish(); };
+
+        // ★ 关键修复: tx.onerror 必须 reject/resolve，否则 Promise 永远不结算
+        tx.onerror = function(e){
+          console.warn('loadImagesFromDB transaction error:', e);
+          finish(); // 不抛错，返回已有的数据
+        };
+
+        // 逐个获取
+        ids.forEach(function(id){
+          try{
+            var ir = imgStore.get(id);
+            ir.onsuccess = function(e){ if(!done && e.target.result) result.images[id] = e.target.result.b64; };
+            ir.onerror = function(){ /* 单条失败不影响整体 */ };
+          }catch(e){}
+          try{
+            var tr = thumbStore.get(id);
+            tr.onsuccess = function(e){ if(!done && e.target.result) result.thumbs[id] = e.target.result.b64; };
+            tr.onerror = function(){ /* 单条失败不影响整体 */ };
+          }catch(e){}
+        });
+      }catch(e){
+        console.warn('loadImagesFromDB error:', e);
+        finish();
+      }
+    }).catch(function(e){
+      console.warn('loadImagesFromDB openDB error:', e);
+      finish();
+    });
+  });
 }
 
-// ── Load saved photos — 数据清洗 + base64 缩略图 ────────────
-function loadSavedPhotos(){
-  var metaStore = loadMetaFromStorage();
-  return openDB().then(function(db){
-    return new Promise(function(ok){
-      var tx = db.transaction(['photos','thumbs'],'readonly');
-      var pReq = tx.objectStore('photos').getAll();
-      var tReq = tx.objectStore('thumbs').getAll();
-      var pData=[], tData=[];
-      pReq.onsuccess=function(e){pData=e.target.result||[]};
-      tReq.onsuccess=function(e){tData=e.target.result||[]};
-      tx.oncomplete=function(){
-        var tMap={};
-        tData.forEach(function(t){tMap[t.id]=t.b64||''});
-        var photos=[];
-        pData.forEach(function(r){
-          try{
-            var m = metaStore[r.id] || {};
-            var p = normalizePhoto({
-              id: r.id,
-              filename: m.fn||'IMG.jpg',
-              size: m.sz||r.blob.size,
-              datetime: m.dt||new Date().toISOString(),
-              lat: m.lat, lng: m.lon,
-              camera: m.cam,
-            });
-            if(!p) return;
-            // 缩略图优先用存储的 base64，否则从 IndexedDB 取，都没有则用原图 blob
-            p.thumbUrl = m.tb64 || tMap[r.id] || '';
-            // 原图 blob URL（当前会话有效）
-            p.url = r.blob ? URL.createObjectURL(r.blob) : (p.thumbUrl || '');
-            photos.push(p);
-          }catch(e){ console.warn('Load photo failed:', r.id, e); }
-        });
-        ok(photos);
+// ═══════════════════════════════════════════════════════════════
+// 照片元数据管理 (localStorage)
+// ═══════════════════════════════════════════════════════════════
+var META_KEY = 'jiying_photo_meta';
+
+function loadMetadata(){
+  try{
+    var raw = localStorage.getItem(META_KEY);
+    var arr = raw ? JSON.parse(raw) : [];
+    if(!Array.isArray(arr)) arr = [];
+    return arr;
+  }catch(e){
+    console.warn('Failed to load metadata:', e);
+    return [];
+  }
+}
+
+function saveMetadata(photos){
+  try{
+    // 只存 metadata，不存 base64 图片数据
+    var meta = photos.map(function(p){
+      return {
+        id: p.id,
+        fileName: p.fileName,
+        shootTime: p.shootTime,
+        importTime: p.importTime,
+        cameraMake: p.cameraMake,
+        cameraModel: p.cameraModel,
+        lat: p.lat,
+        lng: p.lng,
+        hasLocation: p.hasLocation,
+        address: p.address,
+        note: p.note
       };
     });
-  });
+    localStorage.setItem(META_KEY, JSON.stringify(meta));
+  }catch(e){
+    console.error('Failed to save metadata:', e);
+    showToast('存储空间不足', 'warn');
+  }
 }
 
-// ── EXIF Parser ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// 启动时加载所有照片 — 防崩溃设计
+// ═══════════════════════════════════════════════════════════════
+async function loadAllPhotos(){
+  var metaArr = loadMetadata();
+  if(metaArr.length === 0) return [];
+
+  // 收集所有 ID
+  var ids = [];
+  metaArr.forEach(function(m){ if(m && m.id) ids.push(m.id); });
+
+  // 加载 IndexedDB 图片
+  var dbData = {images:{}, thumbs:{}};
+  try{
+    dbData = await loadImagesFromDB(ids);
+  }catch(e){
+    console.warn('IndexedDB load failed:', e);
+  }
+
+  var badCount = 0;
+  var photos = [];
+
+  metaArr.forEach(function(m, i){
+    try{
+      if(!m || !m.id) return;
+
+      var imgB64 = dbData.images[m.id] || null;
+      var thumbB64 = dbData.thumbs[m.id] || null;
+
+      // 如果既没有 image 也没有 thumbnail，尝试从旧字段恢复
+      if(!imgB64 && m.imageData) imgB64 = m.imageData;
+      if(!thumbB64 && m.thumbnailData) thumbB64 = m.thumbnailData;
+
+      // 如果连缩略图都没有，跳过（无法显示）
+      if(!imgB64 && !thumbB64){
+        badCount++; return;
+      }
+
+      var p = normalizePhoto({
+        id: m.id,
+        imageData: imgB64,
+        thumbnailData: thumbB64,
+        fileName: m.fileName,
+        shootTime: m.shootTime,
+        importTime: m.importTime,
+        cameraMake: m.cameraMake,
+        cameraModel: m.cameraModel,
+        lat: m.lat,
+        lng: m.lng,
+        hasLocation: m.hasLocation,
+        address: m.address,
+        note: m.note
+      });
+
+      if(!p){ badCount++; return; }
+      photos.push(p);
+    }catch(e){
+      console.warn('Normalize photo failed:', m.id, e);
+      badCount++;
+    }
+  });
+
+  if(badCount > 0){
+    console.warn('Skipped '+badCount+' bad entries');
+  }
+
+  return photos;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXIF 解析器 — 健壮 GPS 处理
+// ═══════════════════════════════════════════════════════════════
 function readExif(buf){
   var v = new DataView(buf);
-  if(v.getUint16(0)!==0xFFD8)return null;
-  var off=2;
-  while(off<buf.byteLength-2){
-    var m=v.getUint16(off);
-    if(m===0xFFE1){
-      var len=v.getUint16(off+2), es=off+4, s='';
-      for(var i=0;i<6;i++) s+=String.fromCharCode(v.getUint8(es+i));
-      if(s!=='Exif\0\0'){off+=2+len;continue}
+  if(buf.byteLength < 4 || v.getUint16(0) !== 0xFFD8) return null;
+  var off = 2;
+  while(off < buf.byteLength - 2){
+    var m = v.getUint16(off);
+    if(m === 0xFFE1){
+      var len = v.getUint16(off+2);
+      var es = off + 4;
+      var s = '';
+      for(var i=0;i<6;i++){ s += String.fromCharCode(v.getUint8(es+i)); }
+      if(s !== 'Exif\0\0'){ off += 2+len; continue; }
       return parseTiff(v, es+6);
     }
-    if(m===0xFFD9)break;
-    off+=2+v.getUint16(off+2);
+    if(m === 0xFFD9) break;
+    off += 2 + v.getUint16(off+2);
   }
   return null;
 }
-function parseTiff(v,ts){
-  var le=v.getUint16(ts)===0x4949;
-  function r16(o){return v.getUint16(ts+o,le)}
-  function r32(o){return v.getUint32(ts+o,le)}
-  var res={};
+
+function parseTiff(v, ts){
+  var le = v.getUint16(ts) === 0x4949;
+  function r16(o){ return v.getUint16(ts+o, le); }
+  function r32(o){ return v.getUint32(ts+o, le); }
+
+  var res = {};
+
   function readIFD(io){
-    var cnt=r16(io);
+    var cnt = r16(io);
+    if(cnt > 200) return; // 安全上限
     for(var i=0;i<cnt;i++){
-      var e=io+2+i*12, tag=r16(e), typ=r16(e+2), num=r32(e+4);
-      var vs=typ===3||typ===8?2:typ===4||typ===9?4:typ===5||typ===10?8:1;
-      var tot=vs*num, vo=e+8;
-      if(tot>4) vo=ts+r32(e+8);
-      if(tag===0x9003){var dt='';for(var j=0;j<19;j++)dt+=String.fromCharCode(v.getUint8(vo+j));res.dt=dt.replace(/\0/g,'')}
-      if(tag===0x010F){res.make=rdStr(v,vo,tot)}
-      if(tag===0x0110){res.model=rdStr(v,vo,tot)}
-      if(tag===0x0112){res.ori=r16(vo)}
-      if(tag===0x8825){readGPS(v,ts+r32(e+8),le,res)}
+      var e = io+2+i*12;
+      var tag = r16(e), typ = r16(e+2), num = r32(e+4);
+      var vs = (typ===3||typ===8)?2:(typ===4||typ===9)?4:(typ===5||typ===10)?8:1;
+      var tot = vs * num, vo = e+8;
+      if(tot > 4) vo = ts + r32(e+8);
+      if(vo > v.byteLength) continue;
+
+      // DateTimeOriginal (0x9003)
+      if(tag === 0x9003){
+        var dt = '';
+        for(var j=0;j<Math.min(tot,20);j++) dt += String.fromCharCode(v.getUint8(vo+j));
+        res.dt = dt.replace(/\0/g,'').trim();
+      }
+      // Make (0x010F)
+      if(tag === 0x010F){ res.make = readString(v, vo, tot); }
+      // Model (0x0110)
+      if(tag === 0x0110){ res.model = readString(v, vo, tot); }
+      // Orientation (0x0112)
+      if(tag === 0x0112){ res.ori = r16(vo); }
+      // GPS IFD (0x8825)
+      if(tag === 0x8825){
+        try{ parseGPS(v, ts+r32(e+8), le, res); }catch(gpsErr){ console.warn('GPS parse error:', gpsErr); }
+      }
     }
   }
-  readIFD(r32(4));
+
+  try{
+    readIFD(r32(4));
+  }catch(e){
+    console.warn('TIFF IFD0 read error:', e);
+  }
   return res;
 }
-function rdStr(v,o,l){var s='';for(var i=0;i<l&&i<100;i++){var c=v.getUint8(o+i);if(c===0)break;s+=String.fromCharCode(c)}return s.trim()}
-function readGPS(v,gs,le,res){
-  function r16(o){return v.getUint16(gs+o,le)}
-  function r32(o){return v.getUint32(gs+o,le)}
-  var cnt=r16(0);
+
+function readString(v, o, l){
+  var s='';
+  for(var i=0;i<Math.min(l,200);i++){
+    var c = v.getUint8(o+i);
+    if(c===0) break;
+    s += String.fromCharCode(c);
+  }
+  return s.trim();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GPS 解析 — 健壮处理 DMS、十进制、分数、字符串
+// ═══════════════════════════════════════════════════════════════
+function parseGPS(v, gs, le, res){
+  function r16(o){ return v.getUint16(gs+o, le); }
+  function r32(o){ return v.getUint32(gs+o, le); }
+
+  var cnt = r16(0);
+  if(cnt > 50) return; // 安全上限
+  var latDeg=null, latMin=null, latSec=null;
+  var lonDeg=null, lonMin=null, lonSec=null;
+  var latRef='N', lonRef='E';
+
   for(var i=0;i<cnt;i++){
-    var e=2+i*12, tag=r16(e), vo=e+8;
-    function rat(o){var d=r32(o+4);return d!==0?r32(o)/d:NaN}
-    if(tag===2){var a=rat(vo),b=rat(vo+8),c=rat(vo+16);res.glat=a+b/60+c/3600}
-    if(tag===4){var a2=rat(vo),b2=rat(vo+8),c2=rat(vo+16);res.glon=a2+b2/60+c2/3600}
-    if(tag===1&&v.getUint8(gs+vo)===('S').charCodeAt(0))res.glatR='S'
-    if(tag===3&&v.getUint8(gs+vo)===('W').charCodeAt(0))res.glonR='W'
+    var e = 2+i*12;
+    var tag = r16(e);
+    var vo = e+8;
+
+    // 安全读取分数：返回 number 或 NaN
+    function readRational(o){
+      try{
+        var num = r32(o);
+        var den = r32(o+4);
+        if(!Number.isFinite(num) || !Number.isFinite(den) || den===0) return NaN;
+        return num/den;
+      }catch(e2){ return NaN; }
+    }
+
+    // GPSLatitudeRef (tag 1)
+    if(tag===1){
+      try{ var ref = String.fromCharCode(v.getUint8(gs+vo)); if(ref==='N'||ref==='S') latRef=ref; }catch(e2){}
+    }
+    // GPSLatitude (tag 2)
+    if(tag===2){
+      latDeg = readRational(vo);
+      latMin = readRational(vo+8);
+      latSec = readRational(vo+16);
+    }
+    // GPSLongitudeRef (tag 3)
+    if(tag===3){
+      try{ var ref2 = String.fromCharCode(v.getUint8(gs+vo)); if(ref2==='E'||ref2==='W') lonRef=ref2; }catch(e2){}
+    }
+    // GPSLongitude (tag 4)
+    if(tag===4){
+      lonDeg = readRational(vo);
+      lonMin = readRational(vo+8);
+      lonSec = readRational(vo+16);
+    }
+  }
+
+  // 转换为十进制
+  var lat = toDecimal(latDeg, latMin, latSec);
+  var lng = toDecimal(lonDeg, lonMin, lonSec);
+
+  if(isValidCoordinate(lat, lng)){
+    if(latRef==='S') lat = -lat;
+    if(lonRef==='W') lng = -lng;
+    res._glat = lat;
+    res._glon = lng;
   }
 }
 
-// ── Thumbnail Generator (returns base64 data URL) ───────────
-function makeThumb(blob, maxSize){
-  maxSize = maxSize || 600;
-  return new Promise(function(ok,no){
-    var img = new Image(), url = URL.createObjectURL(blob);
+function toDecimal(deg, min, sec){
+  if(!Number.isFinite(deg) && !Number.isFinite(min) && !Number.isFinite(sec)) return NaN;
+  var d = Number.isFinite(deg) ? deg : 0;
+  var m = Number.isFinite(min) ? min : 0;
+  var s = Number.isFinite(sec) ? sec : 0;
+  return d + m/60 + s/3600;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 图像处理：压缩 + 缩略图生成
+// ═══════════════════════════════════════════════════════════════
+function compressImage(file, maxW, maxH, quality){
+  maxW = maxW || 1920; maxH = maxH || 1920; quality = quality || 0.75;
+  return new Promise(function(ok, no){
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function(){
+      URL.revokeObjectURL(url);
+      var w=img.width, h=img.height;
+      if(w>h){ if(w>maxW){ h=h*maxW/w; w=maxW; } }
+      else{ if(h>maxH){ w=w*maxH/h; h=maxH; } }
+      w=Math.round(w); h=Math.round(h);
+      var c=document.createElement('canvas');
+      c.width=w; c.height=h;
+      var ctx=c.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      ok(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); no(new Error('image load fail')); };
+    img.src = url;
+  });
+}
+
+function makeThumbnail(file, maxSize){
+  maxSize = maxSize || 300;
+  return new Promise(function(ok, no){
+    var img = new Image();
+    var url = URL.createObjectURL(file);
     img.onload = function(){
       URL.revokeObjectURL(url);
       var w=img.width, h=img.height, ori=1;
+
+      // 读取 orientation
       var reader = new FileReader();
       reader.onload = function(){
-        try{
-          var exif = readExif(reader.result);
-          if(exif && exif.ori) ori = exif.ori;
-        }catch(e){}
-        if(w>h){if(w>maxSize){h=h*maxSize/w;w=maxSize}}
-        else{if(h>maxSize){w=w*maxSize/h;h=maxSize}}
+        try{ var exif = readExif(reader.result); if(exif && exif.ori) ori=exif.ori; }catch(e){}
+        if(w>h){ if(w>maxSize){ h=h*maxSize/w; w=maxSize; } }
+        else{ if(h>maxSize){ w=w*maxSize/h; h=maxSize; } }
         w=Math.round(w); h=Math.round(h);
         var c=document.createElement('canvas');
         c.width=w; c.height=h;
         var ctx=c.getContext('2d');
-        if(ori>=5&&ori<=8){c.width=h; c.height=w}
+        if(ori>=5 && ori<=8){ c.width=h; c.height=w; }
         ctx.save();
         switch(ori){
-          case 2:ctx.transform(-1,0,0,1,w,0);break;case 3:ctx.transform(-1,0,0,-1,w,h);break;
-          case 4:ctx.transform(1,0,0,-1,0,h);break;case 5:ctx.transform(0,1,1,0,0,0);break;
-          case 6:ctx.transform(0,1,-1,0,h,0);break;case 7:ctx.transform(0,-1,-1,0,h,w);break;
+          case 2:ctx.transform(-1,0,0,1,w,0);break;
+          case 3:ctx.transform(-1,0,0,-1,w,h);break;
+          case 4:ctx.transform(1,0,0,-1,0,h);break;
+          case 5:ctx.transform(0,1,1,0,0,0);break;
+          case 6:ctx.transform(0,1,-1,0,h,0);break;
+          case 7:ctx.transform(0,-1,-1,0,h,w);break;
           case 8:ctx.transform(0,-1,1,0,0,w);break;
         }
         ctx.drawImage(img,0,0,w,h);
         ctx.restore();
-        ok(c.toDataURL('image/jpeg',0.8));
+        ok(c.toDataURL('image/jpeg', 0.8));
       };
-      reader.readAsArrayBuffer(blob.slice(0,65536));
+      reader.readAsArrayBuffer(file.slice(0,131072));
     };
-    img.onerror=function(){URL.revokeObjectURL(url);no(new Error('load fail'))};
+    img.onerror=function(){URL.revokeObjectURL(url);no(new Error('thumb fail'));};
     img.src=url;
   });
 }
 
-// ── Index & Render ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// 时间线渲染
+// ═══════════════════════════════════════════════════════════════
 function indexPhotos(){
-  S.byDate={};
-  S.photos.forEach(function(p,i){
+  S.byDate = {};
+  // 按 shootTime 排序（新在前），没有 shootTime 用 importTime
+  S.photos.sort(function(a,b){
+    var ta = a.shootTime || a.importTime;
+    var tb = b.shootTime || b.importTime;
+    return new Date(tb).getTime() - new Date(ta).getTime();
+  });
+
+  S.photos.forEach(function(p, i){
     p._idx = i;
-    var dt = fmtFull(p.datetime);
+    var useTime = p.shootTime || p.importTime;
+    var dt = fmtFull(useTime);
     p._dk = dt.dateKey;
     p._di = dt;
-    if(!S.byDate[dt.dateKey]) S.byDate[dt.dateKey]=[];
+    if(!S.byDate[dt.dateKey]) S.byDate[dt.dateKey] = [];
     S.byDate[dt.dateKey].push(p);
   });
-  S.dates = Object.keys(S.byDate).sort();
+  S.dates = Object.keys(S.byDate).sort().reverse();
   updateStats();
 }
 
 function updateStats(){
   var gps = 0;
-  S.photos.forEach(function(p){if(p.hasLocation || (isValidCoord(p.lat,p.lng))) gps++});
-  D.stats.textContent = S.photos.length+' 张 · '+S.dates.length+' 天 · '+gps+' 位置';
+  S.photos.forEach(function(p){ if(p.hasLocation) gps++; });
+  D.stats.textContent = S.photos.length+'张 '+S.dates.length+'天 '+gps+'定位';
 }
 
 function initObserver(){
@@ -598,82 +880,119 @@ function initObserver(){
     entries.forEach(function(e){
       if(e.isIntersecting){
         var imgs = e.target.querySelectorAll('img[data-src]');
-        imgs.forEach(function(img){ img.src = img.dataset.src; img.removeAttribute('data-src'); });
+        imgs.forEach(function(img){ img.src = img.dataset.src || ''; img.removeAttribute('data-src'); });
         S.imgObserver.unobserve(e.target);
       }
     });
   }, {rootMargin:'300px'});
 }
 
-// ── Timeline Render ─────────────────────────────────────────
 function renderTimeline(q){
-  q = q || D.search.value;
-  D.timeline.innerHTML = '';
-  var dates=S.dates, byDate=S.byDate;
+  q = q || D.search.value || '';
+  var dates = S.dates, byDate = S.byDate;
+
   if(q.trim()){
     var ql = q.toLowerCase();
-    byDate={}; dates=[];
+    byDate = {}; dates = [];
     S.dates.forEach(function(dk){
       var f = S.byDate[dk].filter(function(p){
-        if(p.filename.toLowerCase().indexOf(ql)>=0) return true;
-        if(p.camera && p.camera.toLowerCase().indexOf(ql)>=0) return true;
-        var n = S.notes[p.id]; if(n && n.toLowerCase().indexOf(ql)>=0) return true;
-        if(fmtDate(p.datetime).indexOf(ql)>=0) return true;
-        if(dk.indexOf(ql)>=0) return true;
+        if(p.fileName.toLowerCase().indexOf(ql)>=0) return true;
+        if(p.note && p.note.toLowerCase().indexOf(ql)>=0) return true;
+        if(p.cameraMake && p.cameraMake.toLowerCase().indexOf(ql)>=0) return true;
+        if(p.cameraModel && p.cameraModel.toLowerCase().indexOf(ql)>=0) return true;
+        if(p.address && p.address.toLowerCase().indexOf(ql)>=0) return true;
+        if(fmtDate(p.shootTime||p.importTime).indexOf(ql)>=0) return true;
         return false;
       });
-      if(f.length>0){byDate[dk]=f; dates.push(dk)}
+      if(f.length>0){ byDate[dk]=f; dates.push(dk); }
     });
-    S.filtered = dates.reduce(function(a,d){return a.concat(byDate[d])},[]);
-  }else{S.filtered=null}
+    S.filtered = dates.reduce(function(a,d){ return a.concat(byDate[d]); }, []);
+  }else{ S.filtered = null; }
 
-  if(dates.length===0){
-    D.timeline.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">没有匹配的照片</div></div>';
+  // 断开旧的 observer，避免引用已销毁的 DOM 节点
+  if(S.imgObserver){ S.imgObserver.disconnect(); initObserver(); }
+
+  D.timelineInner.innerHTML = '';
+
+  if(dates.length === 0){
+    D.timelineInner.innerHTML = '<div class="empty-state"><div class="empty-icon">'+(q.trim()?'🔍':'📷')+'</div><div class="empty-title">'+(q.trim()?'没有匹配的照片':'还没有照片')+'</div><div class="empty-desc">'+(q.trim()?'尝试其他关键词':'点击右上角「+ 导入照片」从手机相册批量导入')+'</div></div>';
     return;
   }
 
   dates.forEach(function(dk){
     var ps = byDate[dk], dt = ps[0]._di;
     var blk = document.createElement('div'); blk.className = 'date-block';
-    blk.innerHTML = '<div class="date-head" id="d-'+dk+'"><div class="date-num">'+dt.day+'</div><div class="date-meta"><div class="date-month">'+MZ[dt.month-1]+' '+dt.year+'</div><div class="date-weekday">'+dt.weekday+'</div></div><div class="date-count">'+ps.length+' 张</div></div>';
+    blk.innerHTML = '<div class="date-head" id="d-'+dk+'"><div class="date-num">'+dt.day+'</div><div class="date-meta"><div class="date-month">'+MONTHS[dt.month-1]+' '+dt.year+'</div><div class="date-weekday">'+dt.weekday+'</div></div><div class="date-count">'+ps.length+' 张</div></div>';
     var grid = document.createElement('div'); grid.className = 'photo-grid';
     ps.forEach(function(p){
       var c = document.createElement('div'); c.className = 'photo-card';
-      if(S.notes[p.id]) c.classList.add('has-note');
+      if(p.note) c.classList.add('has-note');
       c.dataset.idx = p._idx;
-      var src = p.thumbUrl || p.url;
-      c.innerHTML = '<img data-src="'+src+'" alt="'+esc(p.filename)+'"><div class="card-time">'+fmtTime(p.datetime)+'</div>'+
-        ((p.hasLocation || isValidCoord(p.lat,p.lng))?'<div class="gps-dot" title="有位置">📍</div>':'')+
-        (S.notes[p.id]?'<div class="note-dot"></div>':'');
-      c.addEventListener('click', function(){openModal(p._idx)});
-      grid.appendChild(c); S.imgObserver.observe(c);
+      var src = p.thumbnailData || p.imageData || '';
+      var gpsHtml = '';
+      if(p.hasLocation){
+        gpsHtml = '<div class="gps-dot" title="有位置">📍</div>';
+      } else {
+        gpsHtml = '<div class="gps-dot no-gps" title="无位置">📍</div>';
+      }
+      c.innerHTML = '<img data-src="'+src+'" alt="'+esc(p.fileName)+'"><div class="card-time">'+fmtTime(p.shootTime||p.importTime)+'</div>'+gpsHtml+(p.note?'<div class="note-dot"></div>':'');
+      c.addEventListener('click', function(){ openModal(p._idx); });
+      grid.appendChild(c);
+      if(S.imgObserver) S.imgObserver.observe(c);
     });
-    blk.appendChild(grid); D.timeline.appendChild(blk);
+    blk.appendChild(grid); D.timelineInner.appendChild(blk);
   });
 }
 
-// ── 高德地图 ─────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// 逆地理编码 — AMap.Geocoder
+// ═══════════════════════════════════════════════════════════════
+function reverseGeocode(lat, lng, callback){
+  if(typeof AMap === 'undefined' || !AMap.Geocoder){
+    callback(null); return;
+  }
+  try{
+    var geocoder = new AMap.Geocoder({});
+    geocoder.getAddress([lng, lat], function(status, result){
+      if(status === 'complete' && result && result.regeocode){
+        callback(result.regeocode.formattedAddress || null);
+      }else{
+        callback(null);
+      }
+    });
+  }catch(e){
+    console.warn('Geocoder error:', e);
+    callback(null);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 高德地图
+// ═══════════════════════════════════════════════════════════════
 function initMap(){
-  if(typeof AMap === 'undefined'){setTimeout(initMap,500);return}
+  if(typeof AMap === 'undefined'){ setTimeout(initMap, 500); return; }
   if(S.map) return;
-  S.map = new AMap.Map('map-container', {center:[105,35],zoom:4,resizeEnable:true,dragEnable:true,zoomEnable:true,doubleClickZoom:true,keyboard:false});
+  S.map = new AMap.Map('map-container', {
+    center: [105, 35], zoom: 4, resizeEnable: true,
+    dragEnable: true, zoomEnable: true, doubleClickZoom: true, keyboard: false
+  });
   addMapMarkers(); fitMapBounds();
 }
 
 function addMapMarkers(q){
   if(!S.map) return;
-  q = q || D.search.value;
+  q = q || D.search.value || '';
   S.map.clearMap();
-  if(S.cluster){try{S.cluster.clearMarkers();S.map.remove(S.cluster)}catch(e){}}
+  if(S.cluster){ try{ S.cluster.clearMarkers(); S.map.remove(S.cluster); }catch(e){} S.cluster=null; }
 
-  // ★ 关键修复：只取有效坐标的照片
-  var photos = S.photos.filter(function(p){return isValidCoord(p.lat, p.lng)});
+  // 只取有效坐标的照片
+  var photos = S.photos.filter(function(p){ return p.hasLocation; });
   if(q.trim()){
     var ql = q.toLowerCase();
     photos = photos.filter(function(p){
-      if(p.filename.toLowerCase().indexOf(ql)>=0) return true;
-      if(p.camera && p.camera.toLowerCase().indexOf(ql)>=0) return true;
-      var n=S.notes[p.id]; if(n && n.toLowerCase().indexOf(ql)>=0) return true;
+      if(p.fileName.toLowerCase().indexOf(ql)>=0) return true;
+      if(p.note && p.note.toLowerCase().indexOf(ql)>=0) return true;
+      if(p.address && p.address.toLowerCase().indexOf(ql)>=0) return true;
       return false;
     });
   }
@@ -687,136 +1006,202 @@ function addMapMarkers(q){
 
   var markers = [];
   Object.keys(groups).forEach(function(k){
-    var g = groups[k], ll = k.split(',').map(Number), cnt = g.length, first = g[0], dt = fmtFull(first.datetime);
+    var g = groups[k], ll = k.split(',').map(Number);
+    var first = g[0], useTime = first.shootTime || first.importTime;
+    var dt = fmtFull(useTime);
 
-    var content = '<div style="min-width:160px;max-width:260px;font-size:0.8rem;line-height:1.6">';
-    var src = first.thumbUrl || first.url;
+    var content = '<div style="min-width:180px;max-width:280px;font-size:12px;line-height:1.6;color:#333">';
+    var src = first.thumbnailData || first.imageData || '';
     if(src) content += '<img src="'+src+'" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:6px">';
-    content += '<div style="color:#888">'+dt.dateKey+' '+fmtTime(first.datetime)+'</div>';
-    if(cnt>1) content += '<div style="color:#aaa;margin-top:2px">此处共 '+cnt+' 张</div>';
-    content += '<button onclick="viewLocPhotos(\''+k+'\')" style="margin-top:6px;padding:3px 12px;background:#7c3aed;color:#fff;border:none;border-radius:12px;font-size:0.72rem;cursor:pointer">查看全部</button>';
+    content += '<div style="font-weight:600;margin-bottom:2px">'+dt.dateKey+' '+fmtTime(useTime)+'</div>';
+    if(g.length > 1) content += '<div style="color:#999;font-size:11px">此处共 '+g.length+' 张</div>';
+    if(first.address) content += '<div style="color:#555;font-size:11px;margin-top:2px">'+esc(first.address)+'</div>';
+    content += '<div style="color:#999;font-size:11px">'+ll[0].toFixed(6)+', '+ll[1].toFixed(6)+'</div>';
+    content += '<button onclick="viewLocPhotos(\''+k+'\')" style="margin-top:6px;padding:4px 14px;background:#7c3aed;color:#fff;border:none;border-radius:12px;font-size:12px;cursor:pointer">查看全部</button>';
     content += '</div>';
 
-    var marker = new AMap.Marker({ position: [ll[1], ll[0]], title: dt.dateKey, zIndex: 100 }); // ★ [lng, lat]
+    var marker = new AMap.Marker({
+      position: [ll[1], ll[0]], // 高德坐标: [lng, lat]
+      title: dt.dateKey,
+      zIndex: 100
+    });
     marker._group = g; marker._locKey = k;
     marker.on('click', function(){
-      if(marker._iw){marker._iw.open(S.map, marker.getPosition())}
-      else{marker._iw = new AMap.InfoWindow({content:content,offset:new AMap.Pixel(0,-30)});marker._iw.open(S.map, marker.getPosition())}
+      if(this._iw){ this._iw.open(S.map, this.getPosition()); }
+      else{
+        this._iw = new AMap.InfoWindow({ content: content, offset: new AMap.Pixel(0, -30) });
+        this._iw.open(S.map, this.getPosition());
+      }
     });
     markers.push(marker);
   });
 
   if(markers.length > 0){
-    S.cluster = new AMap.MarkerClusterer(S.map, markers, {
-      gridSize:80, maxZoom:18, averageCenter:true,
-      styles:[
-        {url:'',size:{width:40,height:40},textColor:'#fff',textSize:13,style:'background:rgba(124,58,237,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600'},
-        {url:'',size:{width:48,height:48},textColor:'#fff',textSize:14,style:'background:rgba(0,212,255,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600'},
-        {url:'',size:{width:56,height:56},textColor:'#fff',textSize:15,style:'background:rgba(236,72,153,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600'}
-      ]
-    });
+    // 尝试使用聚合插件，失败则直接添加普通 marker
+    try{
+      if(typeof AMap.MarkerClusterer !== 'undefined'){
+        S.cluster = new AMap.MarkerClusterer(S.map, markers, {
+          gridSize: 80, maxZoom: 18, averageCenter: true,
+          styles: [
+            {url:'',size:{width:40,height:40},textColor:'#fff',textSize:13,style:'background:rgba(124,58,237,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;border:2px solid rgba(124,58,237,0.9)'},
+            {url:'',size:{width:48,height:48},textColor:'#fff',textSize:14,style:'background:rgba(0,212,255,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;border:2px solid rgba(0,212,255,0.9)'},
+            {url:'',size:{width:56,height:56},textColor:'#fff',textSize:15,style:'background:rgba(236,72,153,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;border:2px solid rgba(236,72,153,0.9)'}
+          ]
+        });
+      }else{
+        // 没有聚合插件，逐个添加 marker
+        markers.forEach(function(m){ S.map.add(m); });
+      }
+    }catch(e){
+      console.warn('MarkerClusterer error, using plain markers:', e);
+      try{ markers.forEach(function(m){ S.map.add(m); }); }catch(e2){}
+    }
   }
 }
 
 function fitMapBounds(){
-  var withGPS = S.photos.filter(function(p){return isValidCoord(p.lat,p.lng)});
+  var withGPS = S.photos.filter(function(p){ return p.hasLocation; });
   if(withGPS.length === 0) return;
-  if(withGPS.length === 1){ S.map.setZoomAndCenter(14, [withGPS[0].lng, withGPS[0].lat]); }
-  else{ S.map.setFitView(null, false, [80,80,80,80]); }
+  if(withGPS.length === 1){
+    S.map.setZoomAndCenter(14, [withGPS[0].lng, withGPS[0].lat]);
+  }else{
+    S.map.setFitView(null, false, [80,80,80,80]);
+  }
 }
 
+// ── 地图位置筛选 ──────────────────────────────────────────────
 function viewLocPhotos(k){
   switchView('timeline');
   var ll = k.split(',').map(Number);
   var photos = S.photos.filter(function(p){
-    return isValidCoord(p.lat,p.lng) && p.lat.toFixed(4)===ll[0].toFixed(4) && p.lng.toFixed(4)===ll[1].toFixed(4);
+    return p.hasLocation && p.lat.toFixed(4)===ll[0].toFixed(4) && p.lng.toFixed(4)===ll[1].toFixed(4);
   });
   if(photos.length > 0){
     renderLocFilter(photos, k);
-    setTimeout(function(){var el=document.getElementById('d-'+photos[0]._dk);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},200);
+    setTimeout(function(){
+      var el = document.getElementById('d-'+photos[0]._dk);
+      if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+    }, 200);
   }
 }
 
 function renderLocFilter(photos, locKey){
-  var byDate = {}; photos.forEach(function(p){if(!byDate[p._dk])byDate[p._dk]=[];byDate[p._dk].push(p)});
-  S.filtered = photos; D.timeline.innerHTML = '';
+  var byDate = {}; photos.forEach(function(p){
+    if(!byDate[p._dk]) byDate[p._dk] = []; byDate[p._dk].push(p);
+  });
+  S.filtered = photos;
+  if(S.imgObserver){ S.imgObserver.disconnect(); initObserver(); }
+  D.timelineInner.innerHTML = '';
+
   var banner = document.createElement('div');
-  banner.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);border-radius:12px;margin-bottom:18px;font-size:0.8rem;color:var(--text2)';
+  banner.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);border-radius:12px;margin:0 0 18px;font-size:0.8rem;color:var(--text2)';
   var ll = (locKey||'0,0').split(',').map(Number);
-  banner.innerHTML = '<span>📍 此位置 '+photos.length+' 张照片 ('+ll[0].toFixed(4)+','+ll[1].toFixed(4)+')</span><button id="clr-loc" style="margin-left:auto;padding:5px 12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--text);border-radius:16px;cursor:pointer;font-size:0.75rem">✕ 清除</button>';
-  D.timeline.appendChild(banner);
-  banner.querySelector('#clr-loc').addEventListener('click',function(){renderTimeline('')});
-  var dates = Object.keys(byDate).sort();
+  banner.innerHTML = '<span>📍 此位置 '+photos.length+' 张 ('+ll[0].toFixed(4)+','+ll[1].toFixed(4)+')</span><button id="clr-loc" style="margin-left:auto;padding:5px 12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--text);border-radius:16px;cursor:pointer;font-size:0.75rem">✕ 清除</button>';
+  D.timelineInner.appendChild(banner);
+  banner.querySelector('#clr-loc').addEventListener('click', function(){ renderTimeline(''); });
+
+  var dates = Object.keys(byDate).sort().reverse();
   dates.forEach(function(dk){
     var ps = byDate[dk], dt = ps[0]._di;
     var blk = document.createElement('div'); blk.className = 'date-block';
-    blk.innerHTML = '<div class="date-head" id="d-'+dk+'"><div class="date-num">'+dt.day+'</div><div class="date-meta"><div class="date-month">'+MZ[dt.month-1]+' '+dt.year+'</div><div class="date-weekday">'+dt.weekday+'</div></div><div class="date-count">'+ps.length+' 张</div></div>';
+    blk.innerHTML = '<div class="date-head" id="d-'+dk+'"><div class="date-num">'+dt.day+'</div><div class="date-meta"><div class="date-month">'+MONTHS[dt.month-1]+' '+dt.year+'</div><div class="date-weekday">'+dt.weekday+'</div></div><div class="date-count">'+ps.length+' 张</div></div>';
     var grid = document.createElement('div'); grid.className = 'photo-grid';
     ps.forEach(function(p){
       var c = document.createElement('div'); c.className = 'photo-card';
-      if(S.notes[p.id]) c.classList.add('has-note'); c.dataset.idx = p._idx;
-      c.innerHTML = '<img data-src="'+(p.thumbUrl||p.url)+'" alt="'+esc(p.filename)+'"><div class="card-time">'+fmtTime(p.datetime)+'</div>'+(S.notes[p.id]?'<div class="note-dot"></div>':'');
-      c.addEventListener('click',function(){openModal(p._idx)});
-      grid.appendChild(c); S.imgObserver.observe(c);
+      if(p.note) c.classList.add('has-note');
+      c.dataset.idx = p._idx;
+      var gpsDot = p.hasLocation ? '<div class="gps-dot" title="有位置">📍</div>' : '';
+      c.innerHTML = '<img data-src="'+(p.thumbnailData||p.imageData||'')+'" alt="'+esc(p.fileName)+'"><div class="card-time">'+fmtTime(p.shootTime||p.importTime)+'</div>'+gpsDot+(p.note?'<div class="note-dot"></div>':'');
+      c.addEventListener('click', function(){ openModal(p._idx); });
+      grid.appendChild(c);
+      if(S.imgObserver) S.imgObserver.observe(c);
     });
-    blk.appendChild(grid); D.timeline.appendChild(blk);
+    blk.appendChild(grid); D.timelineInner.appendChild(blk);
   });
 }
 
-// ── Switch View ─────────────────────────────────────────────
+// ── 视图切换 ──────────────────────────────────────────────────
 function switchView(v){
   S.view = v;
-  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});
-  D.tabs.forEach(function(t){t.classList.remove('active')});
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+  D.tabs.forEach(function(t){ t.classList.remove('active'); });
   if(v==='timeline'){
     D.timeline.classList.add('active');
     document.querySelector('[data-view="timeline"]').classList.add('active');
   }else{
     D.mapView.classList.add('active');
     document.querySelector('[data-view="map"]').classList.add('active');
-    if(!S.map) initMap();
-    else{setTimeout(function(){S.map.setFitView(null,false,[80,80,80,80])},200);addMapMarkers();}
+    if(!S.map){ initMap(); }
+    else{ setTimeout(function(){ S.map.setFitView(null,false,[80,80,80,80]); addMapMarkers(); }, 200); }
   }
 }
 
-// ── Photo Modal ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// 照片详情 Modal
+// ═══════════════════════════════════════════════════════════════
 function openModal(idx){
   S.curIdx = idx;
-  var p = S.photos[idx]; if(!p) return;
-  D.modalImg.src = p.url; D.modalImg.alt = p.filename;
-  var dt = fmtFull(p.datetime);
-  D.modalDate.textContent = dt.year+'年'+dt.month+'月'+dt.day+'日';
-  D.modalTime.textContent = fmtTime(p.datetime);
-  D.modalCamera.textContent = p.camera || '未知';
-  D.noteInput.value = S.notes[p.id] || ''; D.noteSaved.style.opacity = '0';
+  var p = S.photos[idx];
+  if(!p) return;
 
-  // ★ 安全显示 GPS
-  if(p.hasLocation || isValidCoord(p.lat, p.lng)){
-    D.modalLoc.textContent = Number(p.lat).toFixed(6)+', '+Number(p.lng).toFixed(6);
+  D.modalImg.src = p.imageData || p.thumbnailData || '';
+  D.modalImg.alt = p.fileName;
+
+  var useTime = p.shootTime || p.importTime;
+  var dt = fmtFull(useTime);
+  D.modalDate.textContent = dt.year+'年'+dt.month+'月'+dt.day+'日 '+dt.weekday;
+  D.modalTime.textContent = fmtTime(useTime);
+
+  // 相机
+  var cam = [];
+  if(p.cameraMake) cam.push(p.cameraMake);
+  if(p.cameraModel) cam.push(p.cameraModel);
+  D.modalCamera.textContent = cam.length>0 ? cam.join(' ') : '未知';
+
+  // 位置
+  if(p.hasLocation){
+    D.modalLoc.textContent = p.lat.toFixed(6)+', '+p.lng.toFixed(6);
     D.modalMinimap.style.display = 'block';
-    setTimeout(function(){renderMinimap(p.lat, p.lng)}, 350);
+    setTimeout(function(){ renderMinimap(p.lat, p.lng); }, 350);
+
+    // 地址显示
+    if(p.address){
+      D.modalAddr.textContent = p.address;
+      D.modalAddrRow.style.display = 'flex';
+    }else{
+      D.modalAddrRow.style.display = 'none';
+    }
   }else{
-    D.modalLoc.textContent = '无位置信息';
+    D.modalLoc.textContent = '无 GPS 位置信息';
+    D.modalAddrRow.style.display = 'none';
     D.modalMinimap.style.display = 'none';
+    if(S.minimap){ try{ S.minimap.destroy(); }catch(e){} S.minimap=null; }
   }
-  D.modal.classList.add('open'); document.body.style.overflow = 'hidden'; updateNav();
+
+  D.noteInput.value = p.note || '';
+  D.noteSaved.style.opacity = '0';
+  D.modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  updateNav();
 }
 
 function closeModal(){
-  D.modal.classList.remove('open'); document.body.style.overflow = '';
-  if(S.minimap){try{S.minimap.destroy()}catch(e){};S.minimap=null}
+  D.modal.classList.remove('open');
+  document.body.style.overflow = '';
+  if(S.minimap){ try{ S.minimap.destroy(); }catch(e){} S.minimap=null; }
 }
 
 function renderMinimap(lat, lon){
-  if(!isValidCoord(lat,lon)){D.modalMinimap.style.display='none';return}
-  if(S.minimap){try{S.minimap.destroy()}catch(e){};S.minimap=null}
+  if(!isValidCoordinate(lat, lon)){ D.modalMinimap.style.display='none'; return; }
+  if(S.minimap){ try{ S.minimap.destroy(); }catch(e){} S.minimap=null; }
   D.modalMinimap.innerHTML = ''; D.modalMinimap.style.display = 'block';
-  if(window.innerWidth < 400){D.modalMinimap.style.display='none';return}
+  if(window.innerWidth < 400){ D.modalMinimap.style.display='none'; return; }
   var rect = D.modalMinimap.getBoundingClientRect();
-  if(rect.width < 10 || rect.height < 10){setTimeout(function(){renderMinimap(lat,lon)},200);return}
+  if(rect.width < 10 || rect.height < 10){ setTimeout(function(){ renderMinimap(lat, lon); }, 200); return; }
   S.minimap = new AMap.Map(D.modalMinimap, {
     center: [lon, lat], zoom: 14, resizeEnable: true,
-    dragEnable: false, zoomEnable: false, doubleClickZoom: false, keyboard: false, scrollWheel: false,
+    dragEnable: false, zoomEnable: false, doubleClickZoom: false,
+    keyboard: false, scrollWheel: false
   });
   new AMap.Marker({ position: [lon, lat], map: S.minimap });
 }
@@ -826,134 +1211,264 @@ function updateNav(){
   var idx = photos.indexOf(S.photos[S.curIdx]);
   document.querySelector('.modal-nav.prev').style.display = (idx>0)?'flex':'none';
   document.querySelector('.modal-nav.next').style.display = (idx<photos.length-1)?'flex':'none';
-  S._fi = idx>=0?idx:S.curIdx;
+  _fi = idx >= 0 ? idx : S.curIdx;
 }
 
 function navModal(dir){
   var photos = S.filtered || S.photos;
-  var ni = (S._fi!==undefined?S._fi:S.curIdx)+dir;
-  if(ni>=0 && ni<photos.length) openModal(photos[ni]._idx);
+  var ni = (_fi !== undefined ? _fi : S.curIdx) + dir;
+  if(ni >= 0 && ni < photos.length) openModal(photos[ni]._idx);
 }
 
-// ── Photo Import ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// 照片导入
+// ═══════════════════════════════════════════════════════════════
 function startImport(){
   var input = document.createElement('input');
-  input.type='file'; input.accept='image/*'; input.multiple=true;
-  input.onchange = function(){if(input.files.length>0)processImport(input.files)};
+  input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+  input.onchange = function(){ if(input.files.length>0) processImport(input.files); };
   input.click();
 }
 
 async function processImport(files){
   var total = files.length;
   D.progress.classList.add('show');
-  var metaStore = loadMetaFromStorage();
   var newPhotos = [];
 
   for(var i=0;i<total;i++){
     var file = files[i];
     try{
-      var buf = await file.slice(0,131072).arrayBuffer(), exif = readExif(buf);
+      // 1. 读 EXIF
+      var buf = await file.slice(0,131072).arrayBuffer();
+      var exif = readExif(buf);
 
-      var dt = new Date();
-      if(exif && exif.dt){ var dts = exif.dt.replace(/:/,'-').replace(/:/,'-'), parsed = new Date(dts);
-        if(!isNaN(parsed.getTime())) dt = parsed; }
+      // 2. 拍摄时间
+      var shootTime = null;
+      if(exif && exif.dt){
+        try{
+          var dts = exif.dt.replace(/:/g,'-').replace(/ /g,'T');
+          var parsed = new Date(dts);
+          if(!isNaN(parsed.getTime())) shootTime = parsed.toISOString();
+        }catch(e2){}
+      }
+      var importTime = new Date().toISOString();
 
-      // ★ 缩略图存为 base64 data URL
-      var thumbB64 = await makeThumb(file, 600);
-      var pid = 'p_'+Date.now()+'_'+i;
-
-      // ★ GPS 验证
-      var lat=null, lng=null;
-      if(exif && exif.glat!==undefined && exif.glon!==undefined){
-        lat = exif.glat; if(exif.glatR==='S') lat=-lat;
-        lng = exif.glon; if(exif.glonR==='W') lng=-lng;
-        if(!isValidCoord(lat, lng)){ lat=null; lng=null; }
+      // 3. GPS — 健壮处理
+      var lat = null, lng = null;
+      if(exif && exif._glat !== undefined && exif._glon !== undefined){
+        var rawLat = Number(exif._glat);
+        var rawLng = Number(exif._glon);
+        if(isValidCoordinate(rawLat, rawLng)){
+          lat = rawLat; lng = rawLng;
+        }
       }
 
-      var cam = null;
-      if(exif && (exif.make||exif.model)) cam = (exif.make+' '+(exif.model||'')).trim();
+      // 4. 相机
+      var cameraMake = (exif && exif.make) ? exif.make.trim() : null;
+      var cameraModel = (exif && exif.model) ? exif.model.trim() : null;
 
-      // 存 blob 到 IndexedDB + base64 缩略图
-      await saveToDB(pid, file, thumbB64);
+      // 5. 生成 ID
+      var pid = 'p_'+Date.now()+'_'+i;
 
-      // 存元数据（含 base64 缩略图）
-      metaStore[pid] = {
-        fn:file.name, dt:dt.toISOString(), sz:file.size,
-        lat:lat, lon:lng, cam:cam, tb64:thumbB64
+      // 6. 地址（逆地理编码）— 使用 capturedPid 解决闭包问题
+      var address = null;
+      if(lat !== null && lng !== null){
+        (function(capturedPid, capturedLat, capturedLng){
+          reverseGeocode(capturedLat, capturedLng, function(addr){
+            if(addr){
+              var p = S.photos.find(function(x){ return x.id === capturedPid; });
+              if(p){ p.address = addr; saveMetadata(S.photos); }
+            }
+          });
+        })(pid, lat, lng);
+      }
+
+      // 7. 生成缩略图 (base64)
+      var thumbB64 = await makeThumbnail(file, 300);
+
+      // 8. 压缩全图 (base64, max 1920px)
+      var imageB64 = await compressImage(file, 1920, 1920, 0.75);
+
+      // 存 IndexedDB
+      await saveImageToDB(pid, imageB64, thumbB64);
+
+      // 构建 photo 对象
+      var hasLoc = lat !== null && lng !== null;
+      var pObj = {
+        id: pid,
+        imageData: imageB64,
+        thumbnailData: thumbB64,
+        fileName: file.name,
+        shootTime: shootTime,
+        importTime: importTime,
+        cameraMake: cameraMake,
+        cameraModel: cameraModel,
+        lat: lat,
+        lng: lng,
+        hasLocation: hasLoc,
+        address: address,
+        note: ''
       };
-      saveMetaToStorage(metaStore);
 
-      var url = URL.createObjectURL(file);
-      var pObj = normalizePhoto({
-        id:pid, filename:file.name, size:file.size,
-        datetime:dt.toISOString(), lat:lat, lng:lng, camera:cam
-      });
-      pObj.url = url; pObj.thumbUrl = thumbB64;
       newPhotos.push(pObj);
 
-    }catch(err){ console.warn('Import fail:', file.name, err); }
+    }catch(err){
+      console.warn('Import fail:', file.name, err);
+    }
 
     var pct = Math.round((i+1)/total*100);
     D.progressFill.style.width = pct+'%';
     D.progressText.textContent = (i+1)+'/'+total;
   }
 
+  // 合并到状态
   S.photos = S.photos.concat(newPhotos);
-  indexPhotos(); renderTimeline(''); updateStats();
+  saveMetadata(S.photos);
+  indexPhotos();
+  renderTimeline('');
+  updateStats();
   D.progress.classList.remove('show');
-  showToast('✓ 已导入 '+newPhotos.length+' 张照片');
+  showToast('已导入 '+newPhotos.length+' 张照片');
 }
 
-function showToast(msg){
-  D.toast.textContent = msg; D.toast.classList.add('show');
-  setTimeout(function(){D.toast.classList.remove('show')}, 2500);
+// ═══════════════════════════════════════════════════════════════
+// 清空数据
+// ═══════════════════════════════════════════════════════════════
+function confirmClearData(){
+  D.clearConfirm.classList.add('show');
 }
-
-// ── Event Listeners ─────────────────────────────────────────
-function bindEvents(){
-  D.tabs.forEach(function(t){ t.addEventListener('click',function(){switchView(t.dataset.view)}); });
-  var st; D.search.addEventListener('input',function(){clearTimeout(st);st=setTimeout(function(){if(S.view==='timeline')renderTimeline();else addMapMarkers()},250)});
-  D.importBtn.addEventListener('click', startImport);
-  D.modal.addEventListener('click',function(e){if(e.target===D.modal)closeModal()});
-  document.getElementById('modal-close').addEventListener('click',closeModal);
-  document.querySelector('.modal-nav.prev').addEventListener('click',function(){navModal(-1)});
-  document.querySelector('.modal-nav.next').addEventListener('click',function(){navModal(1)});
-  D.noteSave.addEventListener('click',function(){
-    var p=S.photos[S.curIdx]; if(!p)return;
-    var note=D.noteInput.value.trim(); if(note)S.notes[p.id]=note;else delete S.notes[p.id];
-    saveNotes(); D.noteSaved.style.opacity='1';
-    setTimeout(function(){D.noteSaved.style.opacity='0'},1500);
-    if(S.view==='timeline')renderTimeline('');
-  });
-  document.addEventListener('keydown',function(e){
-    if(!D.modal.classList.contains('open'))return;
-    if(e.key==='Escape')closeModal();
-    if(e.key==='ArrowLeft')navModal(-1);
-    if(e.key==='ArrowRight')navModal(1);
-  });
-  window.addEventListener('online',function(){S.isOnline=true;D.offlineBanner.classList.remove('show')});
-  window.addEventListener('offline',function(){S.isOnline=false;D.offlineBanner.classList.add('show')});
+function cancelClearData(){
+  D.clearConfirm.classList.remove('show');
 }
-
-// ── Init ─────────────────────────────────────────────────────
-async function initApp(){
-  initDom(); bindEvents(); initObserver(); loadNotes();
-  D.loadingText.textContent = '正在加载本地照片...';
+async function executeClearData(){
+  D.clearConfirm.classList.remove('show');
+  // 清除 localStorage
+  try{ localStorage.removeItem(META_KEY); }catch(e){}
+  try{ localStorage.removeItem('pd_meta'); localStorage.removeItem('pd_notes'); localStorage.removeItem('_pwd_hash'); localStorage.removeItem('jiying_photo_meta'); }catch(e){}
+  // 清除 IndexedDB
   try{
-    var saved = await loadSavedPhotos();
-    if(saved.length > 0){ S.photos = saved;
-      D.loadingText.textContent = '已加载 '+saved.length+' 张照片'; }
-  }catch(e){ console.warn('DB load failed:', e); }
+    await new Promise(function(ok,no){
+      var r = indexedDB.deleteDatabase(DB_NAME);
+      r.onsuccess = ok; r.onerror = no;
+    });
+  }catch(e){ console.warn('Delete DB failed:', e); }
+  try{
+    await new Promise(function(ok,no){
+      var r = indexedDB.deleteDatabase('pd_db');
+      r.onsuccess = ok; r.onerror = no;
+    });
+  }catch(e){}
+
+  // 重置状态
+  S.photos = []; S.byDate = {}; S.dates = []; S.filtered = null;
+  if(S.cluster){ try{ S.cluster.clearMarkers(); S.map.remove(S.cluster); }catch(e){} S.cluster=null; }
+  if(S.map){ S.map.clearMap(); S.map.setZoomAndCenter(4, [105,35]); }
+  indexPhotos(); renderTimeline(''); updateStats();
+  showToast('所有数据已清空', 'warn');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 事件绑定
+// ═══════════════════════════════════════════════════════════════
+function bindEvents(){
+  D.tabs.forEach(function(t){
+    t.addEventListener('click', function(){ switchView(t.dataset.view); });
+  });
+
+  var st;
+  D.search.addEventListener('input', function(){
+    clearTimeout(st);
+    st = setTimeout(function(){
+      if(S.view==='timeline') renderTimeline();
+      else addMapMarkers();
+    }, 250);
+  });
+
+  D.importBtn.addEventListener('click', startImport);
+  D.clearBtn.addEventListener('click', confirmClearData);
+  D.modal.addEventListener('click', function(e){ if(e.target===D.modal) closeModal(); });
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.querySelector('.modal-nav.prev').addEventListener('click', function(){ navModal(-1); });
+  document.querySelector('.modal-nav.next').addEventListener('click', function(){ navModal(1); });
+
+  D.noteSave.addEventListener('click', function(){
+    var p = S.photos[S.curIdx]; if(!p) return;
+    var note = D.noteInput.value.trim();
+    p.note = note;
+    saveMetadata(S.photos);
+    D.noteSaved.style.opacity = '1';
+    setTimeout(function(){ D.noteSaved.style.opacity = '0'; }, 1500);
+    if(S.view==='timeline') renderTimeline('');
+  });
+
+  document.getElementById('btn-cancel-clear').addEventListener('click', cancelClearData);
+  document.getElementById('btn-confirm-clear').addEventListener('click', executeClearData);
+
+  document.addEventListener('keydown', function(e){
+    if(!D.modal.classList.contains('open')) return;
+    // 如果焦点在 textarea，不拦截方向键
+    var tag = document.activeElement ? document.activeElement.tagName : '';
+    var isInput = (tag==='TEXTAREA' || tag==='INPUT');
+    if(e.key==='Escape'){ e.preventDefault(); closeModal(); }
+    if(!isInput && e.key==='ArrowLeft'){ e.preventDefault(); navModal(-1); }
+    if(!isInput && e.key==='ArrowRight'){ e.preventDefault(); navModal(1); }
+  });
+
+  window.addEventListener('online', function(){ S.isOnline=true; D.offlineBanner.classList.remove('show'); });
+  window.addEventListener('offline', function(){ S.isOnline=false; D.offlineBanner.classList.add('show'); });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 启动 — 无密码，直接加载
+// ═══════════════════════════════════════════════════════════════
+async function initApp(){
+  initDom();
+  bindEvents();
+  initObserver();
+
+  // 清理旧密码/数据
+  try{ localStorage.removeItem('_pwd_hash'); }catch(e){}
+
+  D.loadingText.textContent = '正在加载本地照片...';
+
+  var badDataWarning = false;
+  try{
+    var saved = await loadAllPhotos();
+    S.photos = saved;
+    D.loadingText.textContent = '已加载 '+saved.length+' 张照片';
+  }catch(e){
+    console.error('Photo load error:', e);
+    badDataWarning = true;
+    S.photos = [];
+  }
 
   indexPhotos();
+
+  // 隐藏 loading
   D.loading.classList.add('hidden');
 
+  // 渲染
   if(S.photos.length === 0){
-    D.timeline.innerHTML = '<div class="empty-state"><div class="empty-icon">📷</div><div class="empty-title">还没有照片</div><div class="empty-desc">点击右上角「+ 导入照片」<br>从手机相册批量导入</div></div>';
-  }else{ renderTimeline(''); }
+    D.timelineInner.innerHTML = '<div class="empty-state"><div class="empty-icon">📷</div><div class="empty-title">还没有照片</div><div class="empty-desc">点击右上角「+ 导入照片」<br>从手机相册批量导入</div></div>';
+  }else{
+    renderTimeline('');
+    if(badDataWarning){
+      var bnr = document.createElement('div');
+      bnr.className = 'error-banner';
+      bnr.textContent = '部分历史数据损坏，已自动忽略';
+      D.timelineInner.insertBefore(bnr, D.timelineInner.firstChild);
+    }
+  }
   updateStats();
+
   if(!S.isOnline) D.offlineBanner.classList.add('show');
+
+  // 预初始化地图
+  if(typeof AMap !== 'undefined') setTimeout(initMap, 800);
 }
+
+// 启动
+initApp();
 </script>
 </body>
 </html>
