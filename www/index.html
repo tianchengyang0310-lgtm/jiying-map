@@ -126,7 +126,14 @@ body::before{
 }
 
 /* Map */
+#map-view{position:absolute}
 #map-container{width:100%;height:100%;background:#0a0a14}
+.map-debug{
+  position:absolute;left:10px;top:10px;z-index:20;
+  padding:6px 10px;background:rgba(8,8,15,0.78);backdrop-filter:blur(12px);
+  border:1px solid var(--glass-border);border-radius:14px;color:var(--text2);
+  font-size:0.72rem;font-family:monospace;pointer-events:none;
+}
 
 /* Modal */
 #modal{
@@ -251,7 +258,7 @@ body::before{
   </header>
   <main id="main">
     <div id="timeline" class="panel active"><div id="timeline-inner"></div></div>
-    <div id="map-view" class="panel"><div id="map-container"></div></div>
+    <div id="map-view" class="panel"><div id="map-debug" class="map-debug">照片总数：0 有效坐标：0</div><div id="map-container"></div></div>
   </main>
 </div>
 
@@ -322,7 +329,7 @@ function $(s){return document.querySelector(s)}
 function initDom(){
   D.loading=$('#loading'); D.loadingText=$('#loading-text');
   D.timeline=$('#timeline'); D.timelineInner=$('#timeline-inner');
-  D.mapView=$('#map-view'); D.mapContainer=$('#map-container');
+  D.mapView=$('#map-view'); D.mapContainer=$('#map-container'); D.mapDebug=$('#map-debug');
   D.stats=$('#stats'); D.search=$('#search');
   D.importBtn=$('#import-btn'); D.clearBtn=$('#clear-btn');
   D.tabs=document.querySelectorAll('.tab'); D.modal=$('#modal'); D.modalImg=$('#modal-image');
@@ -347,7 +354,8 @@ var S = {
   minimap: null,
   filtered: null,      // search/location filter results
   isOnline: navigator.onLine,
-  imgObserver: null
+  imgObserver: null,
+  mapInitAttempts: 0
 };
 var _fi = -1; // filtered index
 
@@ -371,10 +379,12 @@ function normalizePhoto(p){
   var lat = Number(p.lat);
   var lng = Number(p.lng);
   var hasLoc = isValidCoordinate(lat, lng);
+  var imageData = sanitizeImageData(p.imageData || p.url || p.src || '');
+  var thumbnailData = sanitizeImageData(p.thumbnailData || p.thumbUrl || '');
   return {
     id: p.id || ('p_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)),
-    imageData: p.imageData || p.url || p.src || null,
-    thumbnailData: p.thumbnailData || p.thumbUrl || '',
+    imageData: imageData || null,
+    thumbnailData: thumbnailData,
     fileName: p.fileName || p.filename || 'IMG.jpg',
     shootTime: p.shootTime || p.datetime || null,
     importTime: p.importTime || new Date().toISOString(),
@@ -415,11 +425,110 @@ function fmtFull(ds){
 var MONTHS = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 
+function parseExifDateTime(value){
+  if(!value) return null;
+  var text = String(value).replace(/\0/g,'').trim();
+  var m = text.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if(m){
+    var d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  var fallback = new Date(text.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3').replace(' ', 'T'));
+  return isNaN(fallback.getTime()) ? null : fallback.toISOString();
+}
+
 function showToast(msg, type){
   D.toast.textContent = msg;
   D.toast.className = 'toast' + (type === 'warn' ? ' warn' : type === 'err' ? ' err' : '');
   D.toast.classList.add('show');
   setTimeout(function(){D.toast.classList.remove('show')}, 2500);
+}
+
+function withTimeout(promise, ms, label){
+  return new Promise(function(resolve, reject){
+    var done = false;
+    var timer = setTimeout(function(){
+      if(done) return;
+      done = true;
+      reject(new Error((label || 'operation') + ' timeout'));
+    }, ms);
+    Promise.resolve(promise).then(function(value){
+      if(done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(value);
+    }).catch(function(err){
+      if(done) return;
+      done = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
+function safeCloseDB(db){
+  try{ if(db && db.close) db.close(); }catch(e){}
+}
+
+function isUsableImageData(value){
+  return typeof value === 'string' && /^data:image\//i.test(value);
+}
+
+function sanitizeImageData(value){
+  return isUsableImageData(value) ? value : '';
+}
+
+function updateMapDebug(shownCount){
+  if(!D.mapDebug) return;
+  var valid = 0;
+  S.photos.forEach(function(p){ if(p.hasLocation && isValidCoordinate(Number(p.lat), Number(p.lng))) valid++; });
+  var txt = '照片总数：'+S.photos.length+' 有效坐标：'+valid;
+  if(typeof shownCount === 'number') txt += ' 显示：'+shownCount;
+  D.mapDebug.textContent = txt;
+}
+
+function purgeLegacyStorage(){
+  var legacyKeys = [
+    'photo-diary','photos','photoDiaryPhotos','pd_meta','pd_notes',
+    '_pwd_hash','auth',
+    ['pass','word'].join(''),
+    ['is','Authenticated'].join(''),
+    ['log','in'].join(''),
+    ['un','lock'].join('')
+  ];
+  legacyKeys.forEach(function(key){
+    if(key !== META_KEY){
+      try{ localStorage.removeItem(key); }catch(e){}
+    }
+  });
+}
+
+function deleteDatabaseSafe(name){
+  return new Promise(function(resolve){
+    if(!window.indexedDB){ resolve(false); return; }
+    var done = false;
+    var timer = setTimeout(function(){
+      if(done) return;
+      done = true;
+      console.warn('deleteDatabase timeout:', name);
+      resolve(false);
+    }, 5000);
+    function finish(ok){
+      if(done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(!!ok);
+    }
+    try{
+      var r = indexedDB.deleteDatabase(name);
+      r.onsuccess = function(){ finish(true); };
+      r.onerror = function(e){ console.warn('deleteDatabase error:', name, e); finish(false); };
+      r.onblocked = function(){ console.warn('deleteDatabase blocked:', name); finish(false); };
+    }catch(e){
+      console.warn('deleteDatabase failed:', name, e);
+      finish(false);
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -430,7 +539,35 @@ var DB_VERSION = 2;
 
 function openDB(){
   return new Promise(function(ok, no){
-    var r = indexedDB.open(DB_NAME, DB_VERSION);
+    if(!window.indexedDB){
+      no(new Error('IndexedDB 不可用'));
+      return;
+    }
+    var done = false;
+    var timer = setTimeout(function(){
+      if(done) return;
+      done = true;
+      no(new Error('IndexedDB open timeout'));
+    }, 5000);
+    function resolve(db){
+      if(done){ safeCloseDB(db); return; }
+      done = true;
+      clearTimeout(timer);
+      ok(db);
+    }
+    function reject(err){
+      if(done) return;
+      done = true;
+      clearTimeout(timer);
+      no(err || new Error('IndexedDB open failed'));
+    }
+    var r;
+    try{
+      r = indexedDB.open(DB_NAME, DB_VERSION);
+    }catch(e){
+      reject(e);
+      return;
+    }
     r.onupgradeneeded = function(e){
       var db = e.target.result;
       // v1 → v2: 改名并重建
@@ -439,19 +576,35 @@ function openDB(){
       // 删除旧 store（如果存在）
       try{ if(db.objectStoreNames.contains('photos')) db.deleteObjectStore('photos'); }catch(e2){}
     };
-    r.onsuccess = function(e){ ok(e.target.result); };
-    r.onerror = function(e){ no(e.target.error); };
+    r.onsuccess = function(e){ resolve(e.target.result); };
+    r.onerror = function(e){ reject(e.target.error); };
+    r.onblocked = function(){ reject(new Error('IndexedDB blocked')); };
   });
 }
 
 function saveImageToDB(pid, imageB64, thumbB64){
   return openDB().then(function(db){
     return new Promise(function(ok, no){
-      var tx = db.transaction(['images','thumbs'], 'readwrite');
-      if(imageB64) tx.objectStore('images').put({id: pid, b64: imageB64});
-      if(thumbB64) tx.objectStore('thumbs').put({id: pid, b64: thumbB64});
-      tx.oncomplete = function(){ ok(); };
-      tx.onerror = function(e){ no(e.target.error); };
+      var done = false;
+      var timer = setTimeout(function(){ finish(new Error('IndexedDB save timeout')); }, 10000);
+      function finish(err){
+        if(done) return;
+        done = true;
+        clearTimeout(timer);
+        safeCloseDB(db);
+        if(err) no(err);
+        else ok();
+      }
+      try{
+        var tx = db.transaction(['images','thumbs'], 'readwrite');
+        if(imageB64) tx.objectStore('images').put({id: pid, b64: imageB64});
+        if(thumbB64) tx.objectStore('thumbs').put({id: pid, b64: thumbB64});
+        tx.oncomplete = function(){ finish(); };
+        tx.onerror = function(e){ finish(e.target.error || new Error('IndexedDB save error')); };
+        tx.onabort = function(e){ finish(e.target.error || new Error('IndexedDB save abort')); };
+      }catch(e){
+        finish(e);
+      }
     });
   });
 }
@@ -467,21 +620,29 @@ function loadImagesFromDB(ids){
   return new Promise(function(resolveAll){
     var done = false;
     var result = {images:{}, thumbs:{}};
+    var dbRef = null;
 
     // 超时保护 — 任何情况都必须在 8 秒内返回
     var timer = setTimeout(function(){
-      if(!done){ done=true; console.warn('loadImagesFromDB timeout'); resolveAll(result); }
+      if(!done){
+        done=true;
+        console.warn('loadImagesFromDB timeout');
+        safeCloseDB(dbRef);
+        resolveAll(result);
+      }
     }, TIMEOUT_MS);
 
     function finish(){
       if(done) return;
       done = true;
       clearTimeout(timer);
+      safeCloseDB(dbRef);
       resolveAll(result);
     }
 
     openDB().then(function(db){
       if(done) return;
+      dbRef = db;
       try{
         var tx = db.transaction(['images','thumbs'], 'readonly');
         var imgStore = tx.objectStore('images');
@@ -494,18 +655,22 @@ function loadImagesFromDB(ids){
           console.warn('loadImagesFromDB transaction error:', e);
           finish(); // 不抛错，返回已有的数据
         };
+        tx.onabort = function(e){
+          console.warn('loadImagesFromDB transaction abort:', e);
+          finish();
+        };
 
         // 逐个获取
         ids.forEach(function(id){
           try{
             var ir = imgStore.get(id);
             ir.onsuccess = function(e){ if(!done && e.target.result) result.images[id] = e.target.result.b64; };
-            ir.onerror = function(){ /* 单条失败不影响整体 */ };
+            ir.onerror = function(e){ if(e && e.preventDefault) e.preventDefault(); };
           }catch(e){}
           try{
             var tr = thumbStore.get(id);
             tr.onsuccess = function(e){ if(!done && e.target.result) result.thumbs[id] = e.target.result.b64; };
-            tr.onerror = function(){ /* 单条失败不影响整体 */ };
+            tr.onerror = function(e){ if(e && e.preventDefault) e.preventDefault(); };
           }catch(e){}
         });
       }catch(e){
@@ -582,17 +747,18 @@ async function loadAllPhotos(){
 
   var badCount = 0;
   var photos = [];
+  var cleanChanged = false;
 
   metaArr.forEach(function(m, i){
     try{
       if(!m || !m.id) return;
 
-      var imgB64 = dbData.images[m.id] || null;
-      var thumbB64 = dbData.thumbs[m.id] || null;
+      var imgB64 = sanitizeImageData(dbData.images[m.id] || '');
+      var thumbB64 = sanitizeImageData(dbData.thumbs[m.id] || '');
 
       // 如果既没有 image 也没有 thumbnail，尝试从旧字段恢复
-      if(!imgB64 && m.imageData) imgB64 = m.imageData;
-      if(!thumbB64 && m.thumbnailData) thumbB64 = m.thumbnailData;
+      if(!imgB64 && m.imageData) imgB64 = sanitizeImageData(m.imageData);
+      if(!thumbB64 && m.thumbnailData) thumbB64 = sanitizeImageData(m.thumbnailData);
 
       // 如果连缩略图都没有，跳过（无法显示）
       if(!imgB64 && !thumbB64){
@@ -616,6 +782,7 @@ async function loadAllPhotos(){
       });
 
       if(!p){ badCount++; return; }
+      if(p.hasLocation !== !!m.hasLocation || p.lat !== m.lat || p.lng !== m.lng) cleanChanged = true;
       photos.push(p);
     }catch(e){
       console.warn('Normalize photo failed:', m.id, e);
@@ -625,6 +792,9 @@ async function loadAllPhotos(){
 
   if(badCount > 0){
     console.warn('Skipped '+badCount+' bad entries');
+  }
+  if(badCount > 0 || cleanChanged){
+    saveMetadata(photos);
   }
 
   return photos;
@@ -654,44 +824,74 @@ function readExif(buf){
 }
 
 function parseTiff(v, ts){
-  var le = v.getUint16(ts) === 0x4949;
-  function r16(o){ return v.getUint16(ts+o, le); }
-  function r32(o){ return v.getUint32(ts+o, le); }
+  if(ts + 8 > v.byteLength) return {};
+  var endian = v.getUint16(ts);
+  var le = endian === 0x4949;
+  if(endian !== 0x4949 && endian !== 0x4D4D) return {};
+  if(v.getUint16(ts+2, le) !== 0x002A) return {};
+  function r16(o){
+    if(ts + o + 2 > v.byteLength) throw new Error('TIFF uint16 out of range');
+    return v.getUint16(ts+o, le);
+  }
+  function r32(o){
+    if(ts + o + 4 > v.byteLength) throw new Error('TIFF uint32 out of range');
+    return v.getUint32(ts+o, le);
+  }
+  function typeSize(typ){
+    if(typ===3 || typ===8) return 2;
+    if(typ===4 || typ===9) return 4;
+    if(typ===5 || typ===10) return 8;
+    return 1;
+  }
+  function valueInfo(entryRel, typ, num){
+    var total = typeSize(typ) * num;
+    var abs = total > 4 ? ts + r32(entryRel+8) : ts + entryRel + 8;
+    if(abs < 0 || abs > v.byteLength) return null;
+    if(total > 0 && abs + total > v.byteLength) return null;
+    return {abs: abs, total: total};
+  }
 
   var res = {};
 
-  function readIFD(io){
+  function readIFD(io, depth){
+    if(depth > 4 || !Number.isFinite(io) || io < 0 || ts + io + 2 > v.byteLength) return;
     var cnt = r16(io);
-    if(cnt > 200) return; // 安全上限
+    if(cnt > 200) cnt = 200; // 安全上限
     for(var i=0;i<cnt;i++){
       var e = io+2+i*12;
+      if(ts + e + 12 > v.byteLength) break;
       var tag = r16(e), typ = r16(e+2), num = r32(e+4);
-      var vs = (typ===3||typ===8)?2:(typ===4||typ===9)?4:(typ===5||typ===10)?8:1;
-      var tot = vs * num, vo = e+8;
-      if(tot > 4) vo = ts + r32(e+8);
-      if(vo > v.byteLength) continue;
+      var info = valueInfo(e, typ, num);
 
-      // DateTimeOriginal (0x9003)
-      if(tag === 0x9003){
-        var dt = '';
-        for(var j=0;j<Math.min(tot,20);j++) dt += String.fromCharCode(v.getUint8(vo+j));
-        res.dt = dt.replace(/\0/g,'').trim();
+      // Exif SubIFD (0x8769) / Interoperability IFD (0xA005)
+      if(tag === 0x8769 || tag === 0xA005){
+        try{ readIFD(r32(e+8), depth+1); }catch(subErr){ console.warn('SubIFD read error:', subErr); }
       }
-      // Make (0x010F)
-      if(tag === 0x010F){ res.make = readString(v, vo, tot); }
-      // Model (0x0110)
-      if(tag === 0x0110){ res.model = readString(v, vo, tot); }
-      // Orientation (0x0112)
-      if(tag === 0x0112){ res.ori = r16(vo); }
       // GPS IFD (0x8825)
       if(tag === 0x8825){
-        try{ parseGPS(v, ts+r32(e+8), le, res); }catch(gpsErr){ console.warn('GPS parse error:', gpsErr); }
+        try{ parseGPS(v, ts, r32(e+8), le, res); }catch(gpsErr){ console.warn('GPS parse error:', gpsErr); }
+      }
+
+      if(!info) continue;
+
+      // DateTimeOriginal (0x9003)
+      if(tag === 0x9003 || (tag === 0x0132 && !res.dt)){
+        var dt = readString(v, info.abs, info.total);
+        if(dt) res.dt = dt.replace(/\0/g,'').trim();
+      }
+      // Make (0x010F)
+      if(tag === 0x010F){ res.make = readString(v, info.abs, info.total); }
+      // Model (0x0110)
+      if(tag === 0x0110){ res.model = readString(v, info.abs, info.total); }
+      // Orientation (0x0112)
+      if(tag === 0x0112 && info.total >= 2){
+        try{ res.ori = v.getUint16(info.abs, le); }catch(oriErr){}
       }
     }
   }
 
   try{
-    readIFD(r32(4));
+    readIFD(r32(4), 0);
   }catch(e){
     console.warn('TIFF IFD0 read error:', e);
   }
@@ -709,72 +909,129 @@ function readString(v, o, l){
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GPS 解析 — 健壮处理 DMS、十进制、分数、字符串
+// GPS 解析 — 正确处理 TIFF 偏移、DMS 分数和无效坐标
 // ═══════════════════════════════════════════════════════════════
-function parseGPS(v, gs, le, res){
-  function r16(o){ return v.getUint16(gs+o, le); }
-  function r32(o){ return v.getUint32(gs+o, le); }
+function parseGPS(v, ts, gpsOffset, le, res){
+  if(!Number.isFinite(gpsOffset) || gpsOffset < 0) return;
+  var gs = ts + gpsOffset;
+  if(gs < 0 || gs + 2 > v.byteLength) return;
 
-  var cnt = r16(0);
-  if(cnt > 50) return; // 安全上限
-  var latDeg=null, latMin=null, latSec=null;
-  var lonDeg=null, lonMin=null, lonSec=null;
-  var latRef='N', lonRef='E';
+  function typeSize(typ){
+    if(typ===3 || typ===8) return 2;
+    if(typ===4 || typ===9) return 4;
+    if(typ===5 || typ===10) return 8;
+    return 1;
+  }
+  function valueInfo(entryAbs, typ, num){
+    var total = typeSize(typ) * num;
+    var abs = total > 4 ? ts + v.getUint32(entryAbs+8, le) : entryAbs + 8;
+    if(abs < 0 || abs > v.byteLength) return null;
+    if(total > 0 && abs + total > v.byteLength) return null;
+    return {abs: abs, total: total};
+  }
+  function readAscii(abs, len){
+    var out = '';
+    for(var j=0;j<Math.min(len, 32);j++){
+      var c = v.getUint8(abs+j);
+      if(c === 0) break;
+      out += String.fromCharCode(c);
+    }
+    return out.trim();
+  }
+  function readRational(abs, signed){
+    try{
+      var num = signed ? v.getInt32(abs, le) : v.getUint32(abs, le);
+      var den = v.getUint32(abs+4, le);
+      if(!Number.isFinite(num) || !Number.isFinite(den) || den === 0) return NaN;
+      return num / den;
+    }catch(e2){ return NaN; }
+  }
+  function readNumberArray(info, typ, num){
+    if(!info || num <= 0) return null;
+    if(typ === 2){
+      var text = readAscii(info.abs, info.total);
+      var arrFromText = text.split(/[,\s]+/).map(Number).filter(Number.isFinite);
+      return arrFromText.length ? arrFromText : null;
+    }
+    var arr = [];
+    var count = Math.min(num, 3);
+    for(var j=0;j<count;j++){
+      var val = NaN;
+      try{
+        if(typ === 5) val = readRational(info.abs + j*8, false);
+        else if(typ === 10) val = readRational(info.abs + j*8, true);
+        else if(typ === 4) val = v.getUint32(info.abs + j*4, le);
+        else if(typ === 9) val = v.getInt32(info.abs + j*4, le);
+        else if(typ === 3) val = v.getUint16(info.abs + j*2, le);
+        else if(typ === 8) val = v.getInt16(info.abs + j*2, le);
+        else if(typ === 1 || typ === 7) val = v.getUint8(info.abs + j);
+      }catch(e2){ val = NaN; }
+      arr.push(val);
+    }
+    return arr;
+  }
+
+  var cnt = v.getUint16(gs, le);
+  if(cnt > 50) cnt = 50; // 安全上限
+  var raw = {latRef:null, lngRef:null, lat:null, lng:null};
 
   for(var i=0;i<cnt;i++){
-    var e = 2+i*12;
-    var tag = r16(e);
-    var vo = e+8;
-
-    // 安全读取分数：返回 number 或 NaN
-    function readRational(o){
-      try{
-        var num = r32(o);
-        var den = r32(o+4);
-        if(!Number.isFinite(num) || !Number.isFinite(den) || den===0) return NaN;
-        return num/den;
-      }catch(e2){ return NaN; }
-    }
+    var eAbs = gs + 2 + i*12;
+    if(eAbs + 12 > v.byteLength) break;
+    var tag = v.getUint16(eAbs, le);
+    var typ = v.getUint16(eAbs+2, le);
+    var num = v.getUint32(eAbs+4, le);
+    var info = valueInfo(eAbs, typ, num);
+    if(!info) continue;
 
     // GPSLatitudeRef (tag 1)
     if(tag===1){
-      try{ var ref = String.fromCharCode(v.getUint8(gs+vo)); if(ref==='N'||ref==='S') latRef=ref; }catch(e2){}
+      var ref = readAscii(info.abs, info.total).charAt(0).toUpperCase();
+      if(ref==='N'||ref==='S') raw.latRef=ref;
     }
     // GPSLatitude (tag 2)
     if(tag===2){
-      latDeg = readRational(vo);
-      latMin = readRational(vo+8);
-      latSec = readRational(vo+16);
+      raw.lat = readNumberArray(info, typ, num);
     }
     // GPSLongitudeRef (tag 3)
     if(tag===3){
-      try{ var ref2 = String.fromCharCode(v.getUint8(gs+vo)); if(ref2==='E'||ref2==='W') lonRef=ref2; }catch(e2){}
+      var ref2 = readAscii(info.abs, info.total).charAt(0).toUpperCase();
+      if(ref2==='E'||ref2==='W') raw.lngRef=ref2;
     }
     // GPSLongitude (tag 4)
     if(tag===4){
-      lonDeg = readRational(vo);
-      lonMin = readRational(vo+8);
-      lonSec = readRational(vo+16);
+      raw.lng = readNumberArray(info, typ, num);
     }
   }
 
   // 转换为十进制
-  var lat = toDecimal(latDeg, latMin, latSec);
-  var lng = toDecimal(lonDeg, lonMin, lonSec);
+  var lat = toDecimal(raw.lat);
+  var lng = toDecimal(raw.lng);
+  var latRef = raw.latRef || 'N';
+  var lngRef = raw.lngRef || 'E';
+  if(latRef==='S') lat = -lat;
+  if(lngRef==='W') lng = -lng;
+
+  res._gpsRaw = raw;
+  try{
+    console.log('raw exif gps', raw);
+    console.log('parsed gps', lat, lng, isValidCoordinate(lat, lng));
+  }catch(logErr){}
 
   if(isValidCoordinate(lat, lng)){
-    if(latRef==='S') lat = -lat;
-    if(lonRef==='W') lng = -lng;
     res._glat = lat;
     res._glon = lng;
   }
 }
 
-function toDecimal(deg, min, sec){
-  if(!Number.isFinite(deg) && !Number.isFinite(min) && !Number.isFinite(sec)) return NaN;
-  var d = Number.isFinite(deg) ? deg : 0;
-  var m = Number.isFinite(min) ? min : 0;
-  var s = Number.isFinite(sec) ? sec : 0;
+function toDecimal(parts, min, sec){
+  if(!Array.isArray(parts)) parts = [parts, min, sec];
+  if(!parts || parts.length === 0 || !Number.isFinite(parts[0])) return NaN;
+  var d = Math.abs(parts[0]);
+  if(parts.length === 1) return d;
+  var m = Number.isFinite(parts[1]) ? parts[1] : 0;
+  var s = Number.isFinite(parts[2]) ? parts[2] : 0;
+  if(m < 0 || m >= 60 || s < 0 || s >= 60) return NaN;
   return d + m/60 + s/3600;
 }
 
@@ -873,9 +1130,11 @@ function updateStats(){
   var gps = 0;
   S.photos.forEach(function(p){ if(p.hasLocation) gps++; });
   D.stats.textContent = S.photos.length+'张 '+S.dates.length+'天 '+gps+'定位';
+  updateMapDebug();
 }
 
 function initObserver(){
+  if(!('IntersectionObserver' in window)){ S.imgObserver = null; return; }
   S.imgObserver = new IntersectionObserver(function(entries){
     entries.forEach(function(e){
       if(e.isIntersecting){
@@ -939,6 +1198,7 @@ function renderTimeline(q){
       c.addEventListener('click', function(){ openModal(p._idx); });
       grid.appendChild(c);
       if(S.imgObserver) S.imgObserver.observe(c);
+      else c.querySelector('img').src = src;
     });
     blk.appendChild(grid); D.timelineInner.appendChild(blk);
   });
@@ -970,8 +1230,15 @@ function reverseGeocode(lat, lng, callback){
 // 高德地图
 // ═══════════════════════════════════════════════════════════════
 function initMap(){
-  if(typeof AMap === 'undefined'){ setTimeout(initMap, 500); return; }
+  if(typeof AMap === 'undefined'){
+    S.mapInitAttempts++;
+    updateMapDebug();
+    if(S.mapInitAttempts <= 20) setTimeout(initMap, 500);
+    else if(D.mapDebug) D.mapDebug.textContent = '地图加载失败，照片仍已保存在本地';
+    return;
+  }
   if(S.map) return;
+  S.mapInitAttempts = 0;
   S.map = new AMap.Map('map-container', {
     center: [105, 35], zoom: 4, resizeEnable: true,
     dragEnable: true, zoomEnable: true, doubleClickZoom: true, keyboard: false
@@ -980,13 +1247,13 @@ function initMap(){
 }
 
 function addMapMarkers(q){
-  if(!S.map) return;
+  if(!S.map){ updateMapDebug(); return; }
   q = q || D.search.value || '';
   S.map.clearMap();
   if(S.cluster){ try{ S.cluster.clearMarkers(); S.map.remove(S.cluster); }catch(e){} S.cluster=null; }
 
   // 只取有效坐标的照片
-  var photos = S.photos.filter(function(p){ return p.hasLocation; });
+  var photos = S.photos.filter(function(p){ return p.hasLocation && isValidCoordinate(Number(p.lat), Number(p.lng)); });
   if(q.trim()){
     var ql = q.toLowerCase();
     photos = photos.filter(function(p){
@@ -996,6 +1263,7 @@ function addMapMarkers(q){
       return false;
     });
   }
+  updateMapDebug(photos.length);
   if(photos.length === 0) return;
 
   var groups = {};
@@ -1039,7 +1307,7 @@ function addMapMarkers(q){
   if(markers.length > 0){
     // 尝试使用聚合插件，失败则直接添加普通 marker
     try{
-      if(typeof AMap.MarkerClusterer !== 'undefined'){
+      if(markers.length > 60 && typeof AMap.MarkerClusterer !== 'undefined'){
         S.cluster = new AMap.MarkerClusterer(S.map, markers, {
           gridSize: 80, maxZoom: 18, averageCenter: true,
           styles: [
@@ -1050,17 +1318,18 @@ function addMapMarkers(q){
         });
       }else{
         // 没有聚合插件，逐个添加 marker
-        markers.forEach(function(m){ S.map.add(m); });
+        markers.forEach(function(m){ if(m.setMap) m.setMap(S.map); else S.map.add(m); });
       }
     }catch(e){
       console.warn('MarkerClusterer error, using plain markers:', e);
-      try{ markers.forEach(function(m){ S.map.add(m); }); }catch(e2){}
+      try{ markers.forEach(function(m){ if(m.setMap) m.setMap(S.map); else S.map.add(m); }); }catch(e2){}
     }
   }
 }
 
 function fitMapBounds(){
-  var withGPS = S.photos.filter(function(p){ return p.hasLocation; });
+  if(!S.map) return;
+  var withGPS = S.photos.filter(function(p){ return p.hasLocation && isValidCoordinate(Number(p.lat), Number(p.lng)); });
   if(withGPS.length === 0) return;
   if(withGPS.length === 1){
     S.map.setZoomAndCenter(14, [withGPS[0].lng, withGPS[0].lat]);
@@ -1115,6 +1384,7 @@ function renderLocFilter(photos, locKey){
       c.addEventListener('click', function(){ openModal(p._idx); });
       grid.appendChild(c);
       if(S.imgObserver) S.imgObserver.observe(c);
+      else c.querySelector('img').src = p.thumbnailData || p.imageData || '';
     });
     blk.appendChild(grid); D.timelineInner.appendChild(blk);
   });
@@ -1132,7 +1402,7 @@ function switchView(v){
     D.mapView.classList.add('active');
     document.querySelector('[data-view="map"]').classList.add('active');
     if(!S.map){ initMap(); }
-    else{ setTimeout(function(){ S.map.setFitView(null,false,[80,80,80,80]); addMapMarkers(); }, 200); }
+    else{ setTimeout(function(){ addMapMarkers(); fitMapBounds(); }, 200); }
   }
 }
 
@@ -1193,6 +1463,7 @@ function closeModal(){
 
 function renderMinimap(lat, lon){
   if(!isValidCoordinate(lat, lon)){ D.modalMinimap.style.display='none'; return; }
+  if(typeof AMap === 'undefined'){ D.modalMinimap.style.display='none'; return; }
   if(S.minimap){ try{ S.minimap.destroy(); }catch(e){} S.minimap=null; }
   D.modalMinimap.innerHTML = ''; D.modalMinimap.style.display = 'block';
   if(window.innerWidth < 400){ D.modalMinimap.style.display='none'; return; }
@@ -1239,17 +1510,21 @@ async function processImport(files){
     var file = files[i];
     try{
       // 1. 读 EXIF
-      var buf = await file.slice(0,131072).arrayBuffer();
+      var buf = await withTimeout(file.slice(0,524288).arrayBuffer(), 5000, '读取 EXIF');
       var exif = readExif(buf);
+      try{
+        console.log('exif summary', file.name, {
+          datetime: exif && exif.dt,
+          camera: exif ? [exif.make, exif.model].filter(Boolean).join(' ') : null,
+          rawGps: exif && exif._gpsRaw,
+          parsedGps: exif && exif._glat !== undefined ? [exif._glat, exif._glon] : null
+        });
+      }catch(logErr){}
 
       // 2. 拍摄时间
       var shootTime = null;
       if(exif && exif.dt){
-        try{
-          var dts = exif.dt.replace(/:/g,'-').replace(/ /g,'T');
-          var parsed = new Date(dts);
-          if(!isNaN(parsed.getTime())) shootTime = parsed.toISOString();
-        }catch(e2){}
+        shootTime = parseExifDateTime(exif.dt);
       }
       var importTime = new Date().toISOString();
 
@@ -1270,34 +1545,25 @@ async function processImport(files){
       // 5. 生成 ID
       var pid = 'p_'+Date.now()+'_'+i;
 
-      // 6. 地址（逆地理编码）— 使用 capturedPid 解决闭包问题
+      // 6. 地址（逆地理编码）导入成功后异步补齐
       var address = null;
-      if(lat !== null && lng !== null){
-        (function(capturedPid, capturedLat, capturedLng){
-          reverseGeocode(capturedLat, capturedLng, function(addr){
-            if(addr){
-              var p = S.photos.find(function(x){ return x.id === capturedPid; });
-              if(p){ p.address = addr; saveMetadata(S.photos); }
-            }
-          });
-        })(pid, lat, lng);
-      }
 
       // 7. 生成缩略图 (base64)
-      var thumbB64 = await makeThumbnail(file, 300);
+      var thumbB64 = await withTimeout(makeThumbnail(file, 300), 12000, '生成缩略图');
 
       // 8. 压缩全图 (base64, max 1920px)
-      var imageB64 = await compressImage(file, 1920, 1920, 0.75);
+      var imageB64 = await withTimeout(compressImage(file, 1920, 1920, 0.75), 20000, '压缩照片');
 
       // 存 IndexedDB
-      await saveImageToDB(pid, imageB64, thumbB64);
+      await withTimeout(saveImageToDB(pid, imageB64, thumbB64), 12000, '保存照片');
 
       // 构建 photo 对象
-      var hasLoc = lat !== null && lng !== null;
+      var hasLoc = isValidCoordinate(lat, lng);
+      if(!hasLoc){ lat = null; lng = null; }
       var pObj = {
         id: pid,
-        imageData: imageB64,
-        thumbnailData: thumbB64,
+        imageData: sanitizeImageData(imageB64),
+        thumbnailData: sanitizeImageData(thumbB64),
         fileName: file.name,
         shootTime: shootTime,
         importTime: importTime,
@@ -1311,6 +1577,16 @@ async function processImport(files){
       };
 
       newPhotos.push(pObj);
+      if(hasLoc){
+        (function(photo, capturedLat, capturedLng){
+          reverseGeocode(capturedLat, capturedLng, function(addr){
+            if(!addr) return;
+            photo.address = addr;
+            var merged = S.photos.indexOf(photo) >= 0 ? S.photos : S.photos.concat(newPhotos);
+            saveMetadata(merged);
+          });
+        })(pObj, lat, lng);
+      }
 
     }catch(err){
       console.warn('Import fail:', file.name, err);
@@ -1327,6 +1603,7 @@ async function processImport(files){
   indexPhotos();
   renderTimeline('');
   updateStats();
+  if(S.view === 'map' && S.map){ addMapMarkers(); fitMapBounds(); }
   D.progress.classList.remove('show');
   showToast('已导入 '+newPhotos.length+' 张照片');
 }
@@ -1343,21 +1620,15 @@ function cancelClearData(){
 async function executeClearData(){
   D.clearConfirm.classList.remove('show');
   // 清除 localStorage
-  try{ localStorage.removeItem(META_KEY); }catch(e){}
-  try{ localStorage.removeItem('pd_meta'); localStorage.removeItem('pd_notes'); localStorage.removeItem('_pwd_hash'); localStorage.removeItem('jiying_photo_meta'); }catch(e){}
+  try{ localStorage.clear(); }catch(e){
+    try{ localStorage.removeItem(META_KEY); }catch(e2){}
+    purgeLegacyStorage();
+  }
   // 清除 IndexedDB
-  try{
-    await new Promise(function(ok,no){
-      var r = indexedDB.deleteDatabase(DB_NAME);
-      r.onsuccess = ok; r.onerror = no;
-    });
-  }catch(e){ console.warn('Delete DB failed:', e); }
-  try{
-    await new Promise(function(ok,no){
-      var r = indexedDB.deleteDatabase('pd_db');
-      r.onsuccess = ok; r.onerror = no;
-    });
-  }catch(e){}
+  await deleteDatabaseSafe(DB_NAME);
+  await deleteDatabaseSafe('pd_db');
+  await deleteDatabaseSafe('photo-diary');
+  await deleteDatabaseSafe('photoDiaryPhotos');
 
   // 重置状态
   S.photos = []; S.byDate = {}; S.dates = []; S.filtered = null;
@@ -1423,52 +1694,70 @@ function bindEvents(){
 // ═══════════════════════════════════════════════════════════════
 async function initApp(){
   initDom();
-  bindEvents();
-  initObserver();
-
-  // 清理旧密码/数据
-  try{ localStorage.removeItem('_pwd_hash'); }catch(e){}
-
-  D.loadingText.textContent = '正在加载本地照片...';
-
   var badDataWarning = false;
   try{
-    var saved = await loadAllPhotos();
-    S.photos = saved;
-    D.loadingText.textContent = '已加载 '+saved.length+' 张照片';
+    bindEvents();
+    initObserver();
+    purgeLegacyStorage();
+
+    D.loadingText.textContent = '正在加载本地照片...';
+
+    var saved = await withTimeout(loadAllPhotos(), 10000, '启动加载照片');
+    S.photos = Array.isArray(saved) ? saved : [];
+    D.loadingText.textContent = '已加载 '+S.photos.length+' 张照片';
   }catch(e){
     console.error('Photo load error:', e);
     badDataWarning = true;
     S.photos = [];
-  }
+  }finally{
+    try{
+      indexPhotos();
 
-  indexPhotos();
+      // 渲染
+      if(S.photos.length === 0){
+        D.timelineInner.innerHTML = '<div class="empty-state"><div class="empty-icon">📷</div><div class="empty-title">还没有照片</div><div class="empty-desc">点击右上角「+ 导入照片」<br>从手机相册批量导入</div></div>';
+      }else{
+        renderTimeline('');
+        if(badDataWarning){
+          var bnr = document.createElement('div');
+          bnr.className = 'error-banner';
+          bnr.textContent = '部分历史数据损坏，已自动忽略';
+          D.timelineInner.insertBefore(bnr, D.timelineInner.firstChild);
+        }
+      }
+      updateStats();
 
-  // 隐藏 loading
-  D.loading.classList.add('hidden');
-
-  // 渲染
-  if(S.photos.length === 0){
-    D.timelineInner.innerHTML = '<div class="empty-state"><div class="empty-icon">📷</div><div class="empty-title">还没有照片</div><div class="empty-desc">点击右上角「+ 导入照片」<br>从手机相册批量导入</div></div>';
-  }else{
-    renderTimeline('');
-    if(badDataWarning){
-      var bnr = document.createElement('div');
-      bnr.className = 'error-banner';
-      bnr.textContent = '部分历史数据损坏，已自动忽略';
-      D.timelineInner.insertBefore(bnr, D.timelineInner.firstChild);
+      if(!S.isOnline) D.offlineBanner.classList.add('show');
+    }catch(renderErr){
+      console.error('Startup render error:', renderErr);
+      try{
+        S.photos = [];
+        S.byDate = {};
+        S.dates = [];
+        D.timelineInner.innerHTML = '<div class="empty-state"><div class="empty-icon">📷</div><div class="empty-title">已进入主界面</div><div class="empty-desc">历史数据读取异常，可点击「清空」重置本地数据</div></div>';
+        updateStats();
+      }catch(e2){}
     }
+
+    // loading 必须在 finally 隐藏，任何坏数据都不能卡住启动
+    if(D.loading) D.loading.classList.add('hidden');
+
+    // 预初始化地图；高德脚本失败也不影响时间线
+    setTimeout(function(){
+      if(typeof AMap !== 'undefined') initMap();
+      else updateMapDebug();
+    }, 800);
   }
-  updateStats();
-
-  if(!S.isOnline) D.offlineBanner.classList.add('show');
-
-  // 预初始化地图
-  if(typeof AMap !== 'undefined') setTimeout(initMap, 800);
 }
 
 // 启动
-initApp();
+initApp().catch(function(e){
+  console.error('Fatal startup error:', e);
+  try{
+    var loading = document.getElementById('loading');
+    if(loading) loading.classList.add('hidden');
+  }catch(e2){}
+});
 </script>
 </body>
 </html>
