@@ -13,6 +13,12 @@ import android.provider.MediaStore;
 import android.webkit.MimeTypeMap;
 
 import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.ActivityResultRegistryOwner;
+import androidx.activity.result.PickVisualMediaRequest;
+import androidx.activity.result.contract.ActivityResultContract;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.exifinterface.media.ExifInterface;
 
 import com.getcapacitor.FileUtils;
@@ -35,6 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @CapacitorPlugin(
     name = "NativePhotoExif",
@@ -47,6 +54,8 @@ import java.util.UUID;
 )
 public class NativePhotoExifPlugin extends Plugin {
     private static final String SOURCE = "android_exif_original";
+    private final AtomicInteger nextRequestCode = new AtomicInteger();
+    private ActivityResultLauncher<PickVisualMediaRequest> pickMediaLauncher;
 
     @PluginMethod
     public void getLocationFromUri(PluginCall call) {
@@ -103,10 +112,74 @@ public class NativePhotoExifPlugin extends Plugin {
     }
 
     private void openOriginalImagePicker(PluginCall call) {
+        int limit = Math.max(1, Math.min(call.getInt("limit", 50), 100));
+        try {
+            openPhotoPicker(call, limit);
+        } catch (Exception e) {
+            openDocumentPicker(call, limit);
+        }
+    }
+
+    private void openPhotoPicker(final PluginCall call, final int limit) {
+        if (pickMediaLauncher != null) {
+            try {
+                pickMediaLauncher.unregister();
+            } catch (Exception ignored) {
+            }
+            pickMediaLauncher = null;
+        }
+
+        ActivityResultContract<PickVisualMediaRequest, List<Uri>> contract =
+            limit > 1
+                ? new ActivityResultContracts.PickMultipleVisualMedia(limit)
+                : new ActivityResultContracts.PickMultipleVisualMedia();
+
+        pickMediaLauncher = registerActivityResultLauncher(contract, uris -> {
+            JSObject ret = new JSObject();
+            JSArray photos = new JSArray();
+            ret.put("photos", photos);
+
+            if (uris == null || uris.isEmpty()) {
+                ret.put("success", true);
+                call.resolve(ret);
+                return;
+            }
+
+            int count = Math.min(uris.size(), limit);
+            for (int i = 0; i < count; i++) {
+                photos.put(buildPickedPhoto(uris.get(i), i));
+            }
+            ret.put("success", true);
+            call.resolve(ret);
+        });
+
+        pickMediaLauncher.launch(
+            new PickVisualMediaRequest.Builder()
+                .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE)
+                .build()
+        );
+    }
+
+    private <I, O> ActivityResultLauncher<I> registerActivityResultLauncher(
+        ActivityResultContract<I, O> contract,
+        ActivityResultCallback<O> callback
+    ) {
+        String key = "native_photo_exif#" + nextRequestCode.getAndIncrement();
+        if (bridge.getFragment() != null) {
+            Object host = bridge.getFragment().getHost();
+            if (host instanceof ActivityResultRegistryOwner) {
+                return ((ActivityResultRegistryOwner) host).getActivityResultRegistry().register(key, contract, callback);
+            }
+            return bridge.getFragment().requireActivity().getActivityResultRegistry().register(key, contract, callback);
+        }
+        return bridge.getActivity().getActivityResultRegistry().register(key, contract, callback);
+    }
+
+    private void openDocumentPicker(PluginCall call, int limit) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("image/*");
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, call.getInt("limit", 50) > 1);
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, limit > 1);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
 
