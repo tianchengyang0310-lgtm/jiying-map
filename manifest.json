@@ -1,0 +1,18 @@
+{
+  "name": "迹影地图",
+  "short_name": "迹影地图",
+  "description": "本地照片地理日记系统",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF8F3",
+  "theme_color": "#FF7676",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' style='stop-color:%23FF7676'/><stop offset='100%25' style='stop-color:%23FFB347'/></linearGradient></defs><circle cx='50' cy='50' r='48' fill='url(%23g)'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white'>📸</text></svg>",
+      "sizes": "100x100",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

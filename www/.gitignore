@@ -1,0 +1,4 @@
+# 迹影地图 — Git 忽略
+.DS_Store
+Thumbs.db
+*.log

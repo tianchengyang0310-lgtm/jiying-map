@@ -1,8 +1,8 @@
-node_modules/
-.idea/
-*.iml
-.gradle/
-build/
-local.properties
+# ⚠️ 密钥文件绝对不能上传到公开仓库！
 *.keystore
 keystore.properties
+
+# IDE / 本地配置不必要上传
+.idea/
+*.iml
+local.properties
