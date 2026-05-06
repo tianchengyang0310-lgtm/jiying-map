@@ -13,12 +13,19 @@
   --glass:rgba(12,12,24,0.85); --glass-border:rgba(255,255,255,0.08);
   --r:8px; --rm:14px; --rl:20px; --rxl:28px;
   --red:#ef4444; --green:#22c55e; --amber:#eab308;
+  --safe-top:max(env(safe-area-inset-top), 34px);
+  --safe-left:max(env(safe-area-inset-left), 0px);
+  --safe-right:max(env(safe-area-inset-right), 0px);
+  --header-gap:12px;
+}
+@media (orientation:landscape){
+  :root{--safe-top:max(env(safe-area-inset-top), 18px);--header-gap:8px}
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{font-size:16px}
 body{
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  background:var(--bg); color:var(--text); overflow:hidden; height:100vh; width:100vw;
+  background:var(--bg); color:var(--text); overflow:hidden; height:100vh; height:100dvh; width:100vw;
   -webkit-font-smoothing:antialiased;
 }
 body::before{
@@ -27,13 +34,14 @@ body::before{
              radial-gradient(circle at 70% 80%,rgba(0,212,255,0.05),transparent 50%);
   pointer-events:none;z-index:0;
 }
-#app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;width:100vw}
+#app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;height:100dvh;width:100vw}
 
 /* Header */
 #header{
-  display:flex;align-items:center;gap:10px;padding:10px 14px;
-  background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--glass-border);z-index:100;flex-shrink:0;flex-wrap:wrap;
+  display:flex;align-items:center;gap:10px;
+  padding:calc(var(--safe-top) + var(--header-gap)) max(14px,var(--safe-right)) 10px max(14px,var(--safe-left));
+  background:rgba(12,12,24,0.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--glass-border);z-index:1000;flex-shrink:0;flex-wrap:wrap;
 }
 #logo{
   font-size:1.1rem;font-weight:700;letter-spacing:-0.02em;
@@ -515,6 +523,20 @@ function isNativeCapacitor(){
     return !!(window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() !== 'web');
   }catch(e){
     return false;
+  }
+}
+
+async function configureStatusBar(){
+  var StatusBar = getCapPlugin('StatusBar');
+  if(!StatusBar || !isNativeCapacitor()) return;
+  try{
+    if(StatusBar.setStyle) await StatusBar.setStyle({style:'DARK'});
+    if(StatusBar.setBackgroundColor) await StatusBar.setBackgroundColor({color:'#080812'});
+    if(StatusBar.setOverlaysWebView){
+      try{ await StatusBar.setOverlaysWebView({overlay:false}); }catch(e1){}
+    }
+  }catch(e){
+    console.warn('StatusBar config skipped', e);
   }
 }
 
@@ -1159,6 +1181,7 @@ function reasonText(reason){
   var map = {
     NO_GPS: '照片无 GPS EXIF',
     NO_PERMISSION: '无 ACCESS_MEDIA_LOCATION 权限',
+    NO_URI: '没有原始照片 URI',
     INVALID_URI: '原始 URI 无效',
     READ_FAILED: '原始 URI 不可读'
   };
@@ -1795,6 +1818,27 @@ function startFileInputImport(){
 }
 
 async function startNativePhotoImport(){
+  var NativePhotoExif = getCapPlugin('NativePhotoExif');
+  if(NativePhotoExif && NativePhotoExif.pickImagesWithLocation && isNativeCapacitor()){
+    try{
+      var nativePicked = await NativePhotoExif.pickImagesWithLocation({limit:50});
+      var nativePhotos = nativePicked && nativePicked.photos ? nativePicked.photos : [];
+      if(nativePicked && nativePicked.success === false && !nativePhotos.length){
+        throw new Error(nativePicked.reason || nativePicked.message || 'NativePhotoExif picker failed');
+      }
+      if(!nativePhotos.length) return true;
+      var nativeItems = await prepareNativeImportItems(nativePhotos);
+      if(nativeItems.length > 0) await processImport(nativeItems);
+      else showToast('没有可导入的照片', 'warn');
+      return true;
+    }catch(e0){
+      var msg0 = (e0 && (e0.message || e0.toString())) || '';
+      console.warn('NativePhotoExif picker failed, falling back to Camera:', e0);
+      if(/cancel|cancelled|canceled|user/i.test(msg0)) return true;
+      showToast('原始照片读取失败，改用兼容相册模式', 'warn');
+    }
+  }
+
   var Camera = getCapPlugin('Camera');
   if(!Camera || !isNativeCapacitor()) return false;
   try{
@@ -1830,7 +1874,7 @@ async function prepareNativeImportItems(nativePhotos){
   for(var i=0;i<nativePhotos.length;i++){
     var photo = nativePhotos[i];
     var webPath = photo.webPath || photo.path || '';
-    var sourceUri = photo.path || photo.uri || photo.webPath || '';
+    var sourceUri = photo.sourceUri || photo.originalUri || photo.uri || photo.path || photo.webPath || '';
     try{
       if(!webPath) throw new Error('missing webPath');
       var resp = await withTimeout(fetch(webPath), 15000, '读取系统相册图片');
@@ -1839,7 +1883,14 @@ async function prepareNativeImportItems(nativePhotos){
       var ext = (blob.type && blob.type.split('/')[1]) || 'jpg';
       var fileName = photo.name || ('photo_'+Date.now()+'_'+i+'.'+ext.replace('jpeg','jpg'));
       var file = new File([blob], fileName, {type: blob.type || 'image/jpeg'});
-      items.push({file:file, sourceUri:sourceUri, webPath:webPath, nativePhoto:photo, capacitorExif:photo.exif || null});
+      items.push({
+        file:file,
+        sourceUri:sourceUri,
+        webPath:webPath,
+        nativePhoto:photo,
+        nativeLocation:photo.nativeLocation || photo.location || null,
+        capacitorExif:photo.exif || null
+      });
     }catch(e){
       console.warn('Prepare native photo failed:', sourceUri, e);
     }
@@ -1851,7 +1902,7 @@ function normalizeImportItems(input){
   var arr = Array.prototype.slice.call(input || []);
   return arr.map(function(item){
     if(item && item.file) return item;
-    return {file:item, sourceUri:null, webPath:null, nativePhoto:null, capacitorExif:null};
+    return {file:item, sourceUri:null, webPath:null, nativePhoto:null, nativeLocation:null, capacitorExif:null};
   }).filter(function(item){ return item.file; });
 }
 
@@ -1895,6 +1946,14 @@ async function processImport(input){
       var capGps = extractGpsFromExifObject(capExif);
       if(capGps && isValidCoordinate(capGps.lat, capGps.lng)){
         lat = capGps.lat; lng = capGps.lng; gpsSource = capGps.source;
+      }
+      var pickedNativeGps = item.nativeLocation;
+      if(!isValidCoordinate(lat, lng) && pickedNativeGps){
+        if(pickedNativeGps.success && isValidCoordinate(Number(pickedNativeGps.lat), Number(pickedNativeGps.lng))){
+          lat = Number(pickedNativeGps.lat); lng = Number(pickedNativeGps.lng); gpsSource = pickedNativeGps.source || 'android_exif_original';
+        }else if(pickedNativeGps.reason){
+          gpsFailure = pickedNativeGps.reason;
+        }
       }
       if(!isValidCoordinate(lat, lng) && item.sourceUri){
         var nativeGps = await readNativeGpsFromUri(item.sourceUri);
@@ -2082,6 +2141,7 @@ async function initApp(){
   initDom();
   var badDataWarning = false;
   try{
+    await configureStatusBar();
     bindEvents();
     initObserver();
     purgeLegacyStorage();
